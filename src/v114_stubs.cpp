@@ -13,6 +13,10 @@
 #include <limits>
 #include <vector>
 
+#if defined(__AVX2__) || defined(_M_AVX2)
+#include <immintrin.h>
+#endif
+
 namespace deroluna::stages::v114 {
 
 namespace {
@@ -973,47 +977,80 @@ void radix_sort_runs_by_stored_key(std::vector<Stage5Run>* runs,
     if (n <= 1) return;
     tmp->resize(n);
 
-    uint32_t counts0[256] = {};
-    uint32_t counts1[256] = {};
-    uint32_t counts2[256] = {};
-
+    uint32_t counts[3][256] = {};
     for (const Stage5Run& run : *runs) {
-        ++counts0[run.key & 0xffu];
-        ++counts1[(run.key >> 8) & 0xffu];
-        ++counts2[(run.key >> 16) & 0xffu];
+        ++counts[0][run.key & 0xffu];
+        ++counts[1][(run.key >> 8) & 0xffu];
+        ++counts[2][(run.key >> 16) & 0xffu];
     }
 
     // Pass 0
     uint32_t sum0 = 0;
     for (uint32_t i = 0; i < 256; ++i) {
-        uint32_t c = counts0[i];
-        counts0[i] = sum0;
+        uint32_t c = counts[0][i];
+        counts[0][i] = sum0;
         sum0 += c;
     }
-    for (const Stage5Run& run : *runs) {
-        (*tmp)[counts0[run.key & 0xffu]++] = run;
+    size_t i = 0;
+    for (; i + 4 <= n; i += 4) {
+        const Stage5Run r0 = (*runs)[i];
+        const Stage5Run r1 = (*runs)[i + 1];
+        const Stage5Run r2 = (*runs)[i + 2];
+        const Stage5Run r3 = (*runs)[i + 3];
+        (*tmp)[counts[0][r0.key & 0xffu]++] = r0;
+        (*tmp)[counts[0][r1.key & 0xffu]++] = r1;
+        (*tmp)[counts[0][r2.key & 0xffu]++] = r2;
+        (*tmp)[counts[0][r3.key & 0xffu]++] = r3;
+    }
+    for (; i < n; ++i) {
+        const Stage5Run run = (*runs)[i];
+        (*tmp)[counts[0][run.key & 0xffu]++] = run;
     }
 
     // Pass 1
     uint32_t sum1 = 0;
     for (uint32_t i = 0; i < 256; ++i) {
-        uint32_t c = counts1[i];
-        counts1[i] = sum1;
+        uint32_t c = counts[1][i];
+        counts[1][i] = sum1;
         sum1 += c;
     }
-    for (const Stage5Run& run : *tmp) {
-        (*runs)[counts1[(run.key >> 8) & 0xffu]++] = run;
+    i = 0;
+    for (; i + 4 <= n; i += 4) {
+        const Stage5Run r0 = (*tmp)[i];
+        const Stage5Run r1 = (*tmp)[i + 1];
+        const Stage5Run r2 = (*tmp)[i + 2];
+        const Stage5Run r3 = (*tmp)[i + 3];
+        (*runs)[counts[1][(r0.key >> 8) & 0xffu]++] = r0;
+        (*runs)[counts[1][(r1.key >> 8) & 0xffu]++] = r1;
+        (*runs)[counts[1][(r2.key >> 8) & 0xffu]++] = r2;
+        (*runs)[counts[1][(r3.key >> 8) & 0xffu]++] = r3;
+    }
+    for (; i < n; ++i) {
+        const Stage5Run run = (*tmp)[i];
+        (*runs)[counts[1][(run.key >> 8) & 0xffu]++] = run;
     }
 
     // Pass 2
     uint32_t sum2 = 0;
     for (uint32_t i = 0; i < 256; ++i) {
-        uint32_t c = counts2[i];
-        counts2[i] = sum2;
+        uint32_t c = counts[2][i];
+        counts[2][i] = sum2;
         sum2 += c;
     }
-    for (const Stage5Run& run : *runs) {
-        (*tmp)[counts2[(run.key >> 16) & 0xffu]++] = run;
+    i = 0;
+    for (; i + 4 <= n; i += 4) {
+        const Stage5Run r0 = (*runs)[i];
+        const Stage5Run r1 = (*runs)[i + 1];
+        const Stage5Run r2 = (*runs)[i + 2];
+        const Stage5Run r3 = (*runs)[i + 3];
+        (*tmp)[counts[2][(r0.key >> 16) & 0xffu]++] = r0;
+        (*tmp)[counts[2][(r1.key >> 16) & 0xffu]++] = r1;
+        (*tmp)[counts[2][(r2.key >> 16) & 0xffu]++] = r2;
+        (*tmp)[counts[2][(r3.key >> 16) & 0xffu]++] = r3;
+    }
+    for (; i < n; ++i) {
+        const Stage5Run run = (*runs)[i];
+        (*tmp)[counts[2][(run.key >> 16) & 0xffu]++] = run;
     }
     runs->swap(*tmp);
 }
@@ -1483,6 +1520,118 @@ bool emit_full_group_run_compact_fused(const Stage4InputView& view,
     return true;
 }
 
+bool append_materialized_run(FusedStage5Scratch* scratch, uint32_t raw_key,
+                             const uint32_t* origins, uint32_t first,
+                             uint32_t count, uint32_t rel) {
+    const size_t begin = scratch->arena_len;
+    if (count == 0 || begin + count + 7u > scratch->arena_positions.size()) {
+        return false;
+    }
+
+#if defined(__AVX2__) || defined(_M_AVX2)
+    const __m256i relv = _mm256_set1_epi32(static_cast<int>(rel));
+    for (uint32_t copied = 0; copied < count; copied += 8u) {
+        const __m256i positions = _mm256_loadu_si256(
+            reinterpret_cast<const __m256i*>(origins + first + copied));
+        _mm256_storeu_si256(
+            reinterpret_cast<__m256i*>(
+                scratch->arena_positions.data() + begin + copied),
+            _mm256_add_epi32(positions, relv));
+    }
+#else
+    for (uint32_t copied = 0; copied < count; ++copied) {
+        scratch->arena_positions[begin + copied] =
+            origins[first + copied] + rel;
+    }
+#endif
+
+    scratch->arena_len = begin + count;
+    scratch->runs.push_back(make_stage5_run(
+        stage5_radix_order_key(raw_key), static_cast<uint32_t>(begin), count,
+        false));
+    return true;
+}
+
+bool emit_materialized_literals(const Stage4InputView& view, uint32_t start,
+                                uint32_t count,
+                                FusedStage5Scratch* scratch) {
+    const bool padded = has_load24_padding(view);
+    if (scratch->arena_len + count > scratch->arena_positions.size()) {
+        return false;
+    }
+    for (uint32_t rel = 0; rel < count; ++rel) {
+        const uint32_t pos = start + rel;
+        const size_t begin = scratch->arena_len++;
+        scratch->arena_positions[begin] = pos;
+        scratch->runs.push_back(make_stage5_run(
+            stage5_radix_order_key(load24_fast(view, pos, padded)),
+            static_cast<uint32_t>(begin), 1, false));
+    }
+    return true;
+}
+
+bool emit_materialized_group_run(const Stage4InputView& view,
+                                 uint32_t start_group,
+                                 uint32_t end_group,
+                                 FusedStage5Scratch* scratch) {
+    const uint32_t group_count = end_group - start_group;
+    if (group_count == 0) return true;
+    if (group_count > kStage4MaxGroupCount) return false;
+
+    const uint32_t base = start_group << 8;
+    if (group_count == 1) {
+        return emit_materialized_literals(view, base, 256, scratch);
+    }
+
+    std::vector<uint32_t>& order = scratch->order;
+    order.resize(static_cast<size_t>(group_count) + 8u);
+    for (uint32_t chunk = 0; chunk < group_count; ++chunk) {
+        order[chunk] = base + (chunk << 8) + 255u;
+    }
+    std::sort(order.begin(), order.begin() + group_count,
+              [&](uint32_t a, uint32_t b) {
+                  return compare_suffixes(view, a, b) < 0;
+              });
+    for (uint32_t i = 0; i < group_count; ++i) order[i] -= 255u;
+
+    const bool padded = has_load24_padding(view);
+    for (int rel = 255; rel >= 0; --rel) {
+        const uint32_t relu = static_cast<uint32_t>(rel);
+        uint32_t group_start = 0;
+        while (group_start < group_count) {
+            const uint32_t key =
+                load24_fast(view, order[group_start] + relu, padded);
+            uint32_t group_end = group_start + 1;
+            while (group_end < group_count &&
+                   load24_fast(view, order[group_end] + relu, padded) == key) {
+                ++group_end;
+            }
+            if (!append_materialized_run(
+                    scratch, key, order.data(), group_start,
+                    group_end - group_start, relu)) {
+                return false;
+            }
+            group_start = group_end;
+        }
+
+        if (rel > 0) {
+            const uint32_t next_rel = relu - 1u;
+            for (uint32_t i = 1; i < group_count; ++i) {
+                const uint32_t origin = order[i];
+                const uint8_t key = view.data[origin + next_rel];
+                uint32_t j = i;
+                while (j > 0 &&
+                       view.data[order[j - 1u] + next_rel] > key) {
+                    order[j] = order[j - 1u];
+                    --j;
+                }
+                order[j] = origin;
+            }
+        }
+    }
+    return true;
+}
+
 bool fused_try_write_literal_equal_key_group_after_key(
     const Stage5InputView& view, const std::vector<Stage5Run>& runs,
     size_t group_start, size_t group_end, uint8_t* out, size_t* out_pos) {
@@ -1696,6 +1845,73 @@ bool fused_try_hash_two_equal_key_runs_after_key(
         ++right_rel;
     }
 
+    return true;
+}
+
+bool write_materialized_runs_to_sa(const Stage5InputView& view,
+                                   FusedStage5Scratch* scratch,
+                                   uint8_t* out, size_t out_cap,
+                                   size_t* out_len) {
+    if (out_len) *out_len = 0;
+    if (!scratch || !out || !out_len ||
+        scratch->arena_len != view.logical_len) {
+        return false;
+    }
+    const size_t needed = static_cast<size_t>(view.logical_len) * 4u;
+    if (out_cap < needed) return false;
+
+    std::vector<Stage5Run>& runs = scratch->runs;
+    std::vector<uint32_t>& arena = scratch->arena_positions;
+    std::vector<uint32_t>& gathered = scratch->group_positions;
+    radix_sort_runs_by_stored_key(&runs, &scratch->radix_tmp);
+
+    const bool wide_ok = out_cap >= needed + 32u &&
+                         arena.size() >= view.logical_len + 8u;
+    size_t out_pos = 0;
+    size_t run_start = 0;
+    while (run_start < runs.size()) {
+        size_t run_end = run_start + 1;
+        while (run_end < runs.size() &&
+               runs[run_start].key == runs[run_end].key) {
+            ++run_end;
+        }
+
+        if (run_end == run_start + 1) {
+            const Stage5Run& run = runs[run_start];
+            const uint32_t count = stage5_run_count(run);
+            const uint32_t begin = stage5_run_begin(run);
+            std::memcpy(out + out_pos * 4u, arena.data() + begin,
+                        wide_ok && count <= 8u ? 32u
+                                              : static_cast<size_t>(count) * 4u);
+            out_pos += count;
+        } else {
+            size_t count = 0;
+            for (size_t i = run_start; i < run_end; ++i) {
+                count += stage5_run_count(runs[i]);
+            }
+            gathered.resize(count + 8u);
+            size_t gathered_pos = 0;
+            for (size_t i = run_start; i < run_end; ++i) {
+                const uint32_t run_count = stage5_run_count(runs[i]);
+                const uint32_t begin = stage5_run_begin(runs[i]);
+                std::memcpy(gathered.data() + gathered_pos,
+                            arena.data() + begin,
+                            run_count <= 8u ? 32u
+                                            : static_cast<size_t>(run_count) * 4u);
+                gathered_pos += run_count;
+            }
+            std::sort(gathered.begin(), gathered.begin() + count,
+                      [&](uint32_t a, uint32_t b) {
+                          return suffix_less_after_key(view, a, b);
+                      });
+            std::memcpy(out + out_pos * 4u, gathered.data(), count * 4u);
+            out_pos += count;
+        }
+        run_start = run_end;
+    }
+
+    if (out_pos != view.logical_len) return false;
+    *out_len = needed;
     return true;
 }
 
@@ -2490,8 +2706,6 @@ bool stage_v114_sa_build_compact_fused_raw(const uint8_t* data,
 
     const uint32_t full_groups = logical_len >> 8;
     uint32_t run_start = 0;
-    static const bool count1_singletons =
-        env_flag_enabled("DLUNA_STAGE5_COUNT1_SINGLETONS");
 
     FusedStage5Profile* profile =
         fused_stage5_profile_enabled() ? &fused_stage5_profile() : nullptr;
@@ -2499,9 +2713,8 @@ bool stage_v114_sa_build_compact_fused_raw(const uint8_t* data,
     const uint64_t emit0 = profile ? stage5_prof_rdtsc() : 0;
     for (uint32_t group = 1; group <= full_groups; ++group) {
         if (stage4.flags[group] != 0 || group == full_groups) {
-            if (!emit_full_group_run_compact_fused(stage4, run_start, group,
-                                                   scratch,
-                                                   count1_singletons)) {
+            if (!emit_materialized_group_run(stage4, run_start, group,
+                                              scratch)) {
                 *out_len = 0;
                 return false;
             }
@@ -2509,9 +2722,8 @@ bool stage_v114_sa_build_compact_fused_raw(const uint8_t* data,
         }
     }
 
-    if (!emit_fused_literal_records(stage4, full_groups << 8,
-                                    logical_len & 0xffu, scratch,
-                                    count1_singletons)) {
+    if (!emit_materialized_literals(stage4, full_groups << 8,
+                                    logical_len & 0xffu, scratch)) {
         *out_len = 0;
         return false;
     }
@@ -2519,7 +2731,8 @@ bool stage_v114_sa_build_compact_fused_raw(const uint8_t* data,
     fused_stage5_profile_note_emit_shape(
         profile, scratch->runs, scratch->arena_positions, scratch->arena_len);
 
-    const bool ok = write_fused_runs_to_sa(stage5, scratch, out, out_cap, out_len);
+    const bool ok = write_materialized_runs_to_sa(
+        stage5, scratch, out, out_cap, out_len);
     if (profile) {
         profile->total += stage5_prof_rdtsc() - total0;
         profile->runs += scratch->runs.size();

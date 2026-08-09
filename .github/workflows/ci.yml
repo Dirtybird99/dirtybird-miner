@@ -137,16 +137,14 @@ jobs:
           bash ./scripts/release.sh v0.0.0-ci build dist
           tar -tzf dist/dirtybird-miner-amd64-v0.0.0-ci.tar.gz | grep -q 'dirtybird-miner-amd64-v0.0.0-ci/dirtybird-miner-cpu'
 
-      - name: Diagnostic self-test (Windows)
+      - name: Self-test (Windows)
         if: runner.os == 'Windows'
-        continue-on-error: true
         shell: msys2 {0}
-        run: ./build/bin/dirtybird-miner-cpu.exe --test-dero
+        run: ./build/bin/dirtybird-miner-cpu.exe --selftest
 
-      - name: Diagnostic self-test (Linux/macOS)
+      - name: Self-test (Linux/macOS)
         if: runner.os != 'Windows'
-        continue-on-error: true
-        run: ./build/bin/dirtybird-miner-cpu --test-dero
+        run: ./build/bin/dirtybird-miner-cpu --selftest
 
       - name: Upload binaries
         uses: actions/upload-artifact@v4

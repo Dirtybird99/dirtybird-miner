@@ -1910,6 +1910,9 @@ bool write_materialized_runs_to_sa(const Stage5InputView& view,
     std::vector<Stage5Run>& runs = scratch->runs;
     std::vector<uint32_t>& arena = scratch->arena_positions;
     std::vector<uint32_t>& gathered = scratch->group_positions;
+    std::vector<uint32_t>& merge_positions = scratch->merge_positions;
+    std::vector<uint32_t>& run_lengths = scratch->run_lengths;
+    std::vector<uint32_t>& next_run_lengths = scratch->next_run_lengths;
     radix_sort_runs_by_stored_key(&runs, &scratch->radix_tmp);
 
     const bool wide_ok = out_cap >= needed + 32u &&
@@ -1931,10 +1934,14 @@ bool write_materialized_runs_to_sa(const Stage5InputView& view,
                         wide_ok && count <= 8u ? 32u
                                               : static_cast<size_t>(count) * 4u);
             out_pos += count;
-        } else {
+        } else if (!fused_try_write_two_equal_key_runs_after_key(
+                       view, arena, runs, run_start, run_end, out, &out_pos)) {
             size_t count = 0;
+            run_lengths.clear();
             for (size_t i = run_start; i < run_end; ++i) {
-                count += stage5_run_count(runs[i]);
+                const uint32_t run_count = stage5_run_count(runs[i]);
+                count += run_count;
+                run_lengths.push_back(run_count);
             }
             gathered.resize(count + 8u);
             size_t gathered_pos = 0;
@@ -1947,10 +1954,9 @@ bool write_materialized_runs_to_sa(const Stage5InputView& view,
                                             : static_cast<size_t>(run_count) * 4u);
                 gathered_pos += run_count;
             }
-            std::sort(gathered.begin(), gathered.begin() + count,
-                      [&](uint32_t a, uint32_t b) {
-                          return suffix_less_after_key(view, a, b);
-                      });
+            gathered.resize(count);
+            merge_equal_key_runs_after_key(view, &gathered, &merge_positions,
+                                           &run_lengths, &next_run_lengths);
             std::memcpy(out + out_pos * 4u, gathered.data(), count * 4u);
             out_pos += count;
         }

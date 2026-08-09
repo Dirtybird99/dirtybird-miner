@@ -1946,6 +1946,26 @@ bool write_materialized_runs_to_sa(const Stage5InputView& view,
     size_t out_pos = 0;
     size_t run_start = 0;
     while (run_start < runs.size()) {
+        if (run_start + 4u <= runs.size() &&
+            runs[run_start].key != runs[run_start + 1u].key &&
+            runs[run_start + 1u].key != runs[run_start + 2u].key &&
+            runs[run_start + 2u].key != runs[run_start + 3u].key &&
+            (run_start + 4u == runs.size() ||
+             runs[run_start + 3u].key != runs[run_start + 4u].key)) {
+            for (size_t i = 0; i < 4u; ++i) {
+                const Stage5Run& run = runs[run_start + i];
+                const uint32_t count = stage5_run_count(run);
+                std::memcpy(out + out_pos * 4u,
+                            arena.data() + stage5_run_begin(run),
+                            wide_ok && count <= 8u
+                                ? 32u
+                                : static_cast<size_t>(count) * 4u);
+                out_pos += count;
+            }
+            run_start += 4u;
+            continue;
+        }
+
         size_t run_end = run_start + 1;
         while (run_end < runs.size() &&
                runs[run_start].key == runs[run_end].key) {

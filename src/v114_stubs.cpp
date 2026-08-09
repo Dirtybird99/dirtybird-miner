@@ -818,6 +818,20 @@ uint64_t load_be64(const uint8_t* p) {
            static_cast<uint64_t>(p[7]);
 }
 
+uint64_t suffix_prefix_after_key(const Stage5InputView& view, uint32_t pos) {
+    const uint32_t begin = pos + 3u;
+    if (begin + 8u <= view.logical_len) {
+        return load_be64(view.data + begin);
+    }
+
+    uint64_t value = 0;
+    for (uint32_t i = begin, shift = 56u; i < view.logical_len;
+         ++i, shift -= 8u) {
+        value |= static_cast<uint64_t>(view.data[i]) << shift;
+    }
+    return value;
+}
+
 int compare_suffixes_after_key(const Stage5InputView& view, uint32_t a, uint32_t b) {
     if (a == b) return 0;
 
@@ -1724,15 +1738,27 @@ bool fused_try_write_two_equal_key_runs_after_key(
     uint32_t right_rel = 0;
     size_t write_pos = *out_pos;
 
+    uint32_t lpos = fused_run_pos(arena_positions, left, left_rel);
+    uint32_t rpos = fused_run_pos(arena_positions, right, right_rel);
+    uint64_t lprefix = suffix_prefix_after_key(view, lpos);
+    uint64_t rprefix = suffix_prefix_after_key(view, rpos);
+
     while (left_rel < left_count && right_rel < right_count) {
-        const uint32_t lpos = fused_run_pos(arena_positions, left, left_rel);
-        const uint32_t rpos = fused_run_pos(arena_positions, right, right_rel);
-        if (suffix_less_after_key(view, lpos, rpos)) {
+        if (lprefix < rprefix ||
+            (lprefix == rprefix && suffix_less_after_key(view, lpos, rpos))) {
             write_u32_le(out + write_pos * 4u, lpos);
             ++left_rel;
+            if (left_rel < left_count) {
+                lpos = fused_run_pos(arena_positions, left, left_rel);
+                lprefix = suffix_prefix_after_key(view, lpos);
+            }
         } else {
             write_u32_le(out + write_pos * 4u, rpos);
             ++right_rel;
+            if (right_rel < right_count) {
+                rpos = fused_run_pos(arena_positions, right, right_rel);
+                rprefix = suffix_prefix_after_key(view, rpos);
+            }
         }
         ++write_pos;
     }

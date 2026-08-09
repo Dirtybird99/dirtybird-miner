@@ -818,6 +818,20 @@ uint64_t load_be64(const uint8_t* p) {
            static_cast<uint64_t>(p[7]);
 }
 
+uint64_t suffix_prefix_after_key(const Stage5InputView& view, uint32_t pos) {
+    const uint32_t begin = pos + 3u;
+    if (begin + 8u <= view.logical_len) {
+        return load_be64(view.data + begin);
+    }
+
+    uint64_t value = 0;
+    for (uint32_t i = begin, shift = 56u; i < view.logical_len;
+         ++i, shift -= 8u) {
+        value |= static_cast<uint64_t>(view.data[i]) << shift;
+    }
+    return value;
+}
+
 int compare_suffixes_after_key(const Stage5InputView& view, uint32_t a, uint32_t b) {
     if (a == b) return 0;
 
@@ -1594,28 +1608,75 @@ bool emit_materialized_group_run(const Stage4InputView& view,
               });
     for (uint32_t i = 0; i < group_count; ++i) order[i] -= 255u;
 
+    /* Most 256-byte columns are shared by every group. Build the equality
+     * mask once so common runs need one key load and no stable re-sort. */
+    uint32_t equal_columns[8];
+#if defined(__AVX2__) || defined(_M_AVX2)
+    const uint8_t* first_group = view.data + base;
+    const __m256i all_equal = _mm256_set1_epi32(-1);
+    for (uint32_t lane = 0; lane < 8; ++lane) {
+        const __m256i first = _mm256_loadu_si256(
+            reinterpret_cast<const __m256i*>(first_group + lane * 32u));
+        __m256i equal = all_equal;
+        for (uint32_t group = 1; group < group_count; ++group) {
+            const __m256i current = _mm256_loadu_si256(
+                reinterpret_cast<const __m256i*>(
+                    first_group + (group << 8) + lane * 32u));
+            equal = _mm256_and_si256(equal,
+                                     _mm256_cmpeq_epi8(first, current));
+        }
+        equal_columns[lane] =
+            static_cast<uint32_t>(_mm256_movemask_epi8(equal));
+    }
+#else
+    std::fill(std::begin(equal_columns), std::end(equal_columns), ~0u);
+    for (uint32_t rel = 0; rel < 256; ++rel) {
+        const uint8_t first = view.data[base + rel];
+        for (uint32_t group = 1; group < group_count; ++group) {
+            if (view.data[base + (group << 8) + rel] != first) {
+                equal_columns[rel >> 5] &= ~(1u << (rel & 31u));
+                break;
+            }
+        }
+    }
+#endif
+    const auto column_is_equal = [&](uint32_t rel) {
+        return (equal_columns[rel >> 5] >> (rel & 31u)) & 1u;
+    };
+
     const bool padded = has_load24_padding(view);
     for (int rel = 255; rel >= 0; --rel) {
         const uint32_t relu = static_cast<uint32_t>(rel);
-        uint32_t group_start = 0;
-        while (group_start < group_count) {
-            const uint32_t key =
-                load24_fast(view, order[group_start] + relu, padded);
-            uint32_t group_end = group_start + 1;
-            while (group_end < group_count &&
-                   load24_fast(view, order[group_end] + relu, padded) == key) {
-                ++group_end;
-            }
-            if (!append_materialized_run(
-                    scratch, key, order.data(), group_start,
-                    group_end - group_start, relu)) {
+        if (relu <= 253u && column_is_equal(relu) &&
+            column_is_equal(relu + 1u) && column_is_equal(relu + 2u)) {
+            const uint32_t key = load24_fast(view, base + relu, padded);
+            if (!append_materialized_run(scratch, key, order.data(), 0,
+                                         group_count, relu)) {
                 return false;
             }
-            group_start = group_end;
+        } else {
+            uint32_t group_start = 0;
+            while (group_start < group_count) {
+                const uint32_t key =
+                    load24_fast(view, order[group_start] + relu, padded);
+                uint32_t group_end = group_start + 1;
+                while (group_end < group_count &&
+                       load24_fast(view, order[group_end] + relu, padded) ==
+                           key) {
+                    ++group_end;
+                }
+                if (!append_materialized_run(
+                        scratch, key, order.data(), group_start,
+                        group_end - group_start, relu)) {
+                    return false;
+                }
+                group_start = group_end;
+            }
         }
 
         if (rel > 0) {
             const uint32_t next_rel = relu - 1u;
+            if (column_is_equal(next_rel)) continue;
             for (uint32_t i = 1; i < group_count; ++i) {
                 const uint32_t origin = order[i];
                 const uint8_t key = view.data[origin + next_rel];
@@ -1677,15 +1738,27 @@ bool fused_try_write_two_equal_key_runs_after_key(
     uint32_t right_rel = 0;
     size_t write_pos = *out_pos;
 
+    uint32_t lpos = fused_run_pos(arena_positions, left, left_rel);
+    uint32_t rpos = fused_run_pos(arena_positions, right, right_rel);
+    uint64_t lprefix = suffix_prefix_after_key(view, lpos);
+    uint64_t rprefix = suffix_prefix_after_key(view, rpos);
+
     while (left_rel < left_count && right_rel < right_count) {
-        const uint32_t lpos = fused_run_pos(arena_positions, left, left_rel);
-        const uint32_t rpos = fused_run_pos(arena_positions, right, right_rel);
-        if (suffix_less_after_key(view, lpos, rpos)) {
+        if (lprefix < rprefix ||
+            (lprefix == rprefix && suffix_less_after_key(view, lpos, rpos))) {
             write_u32_le(out + write_pos * 4u, lpos);
             ++left_rel;
+            if (left_rel < left_count) {
+                lpos = fused_run_pos(arena_positions, left, left_rel);
+                lprefix = suffix_prefix_after_key(view, lpos);
+            }
         } else {
             write_u32_le(out + write_pos * 4u, rpos);
             ++right_rel;
+            if (right_rel < right_count) {
+                rpos = fused_run_pos(arena_positions, right, right_rel);
+                rprefix = suffix_prefix_after_key(view, rpos);
+            }
         }
         ++write_pos;
     }
@@ -1863,6 +1936,9 @@ bool write_materialized_runs_to_sa(const Stage5InputView& view,
     std::vector<Stage5Run>& runs = scratch->runs;
     std::vector<uint32_t>& arena = scratch->arena_positions;
     std::vector<uint32_t>& gathered = scratch->group_positions;
+    std::vector<uint32_t>& merge_positions = scratch->merge_positions;
+    std::vector<uint32_t>& run_lengths = scratch->run_lengths;
+    std::vector<uint32_t>& next_run_lengths = scratch->next_run_lengths;
     radix_sort_runs_by_stored_key(&runs, &scratch->radix_tmp);
 
     const bool wide_ok = out_cap >= needed + 32u &&
@@ -1870,6 +1946,26 @@ bool write_materialized_runs_to_sa(const Stage5InputView& view,
     size_t out_pos = 0;
     size_t run_start = 0;
     while (run_start < runs.size()) {
+        if (run_start + 4u <= runs.size() &&
+            runs[run_start].key != runs[run_start + 1u].key &&
+            runs[run_start + 1u].key != runs[run_start + 2u].key &&
+            runs[run_start + 2u].key != runs[run_start + 3u].key &&
+            (run_start + 4u == runs.size() ||
+             runs[run_start + 3u].key != runs[run_start + 4u].key)) {
+            for (size_t i = 0; i < 4u; ++i) {
+                const Stage5Run& run = runs[run_start + i];
+                const uint32_t count = stage5_run_count(run);
+                std::memcpy(out + out_pos * 4u,
+                            arena.data() + stage5_run_begin(run),
+                            wide_ok && count <= 8u
+                                ? 32u
+                                : static_cast<size_t>(count) * 4u);
+                out_pos += count;
+            }
+            run_start += 4u;
+            continue;
+        }
+
         size_t run_end = run_start + 1;
         while (run_end < runs.size() &&
                runs[run_start].key == runs[run_end].key) {
@@ -1884,10 +1980,14 @@ bool write_materialized_runs_to_sa(const Stage5InputView& view,
                         wide_ok && count <= 8u ? 32u
                                               : static_cast<size_t>(count) * 4u);
             out_pos += count;
-        } else {
+        } else if (!fused_try_write_two_equal_key_runs_after_key(
+                       view, arena, runs, run_start, run_end, out, &out_pos)) {
             size_t count = 0;
+            run_lengths.clear();
             for (size_t i = run_start; i < run_end; ++i) {
-                count += stage5_run_count(runs[i]);
+                const uint32_t run_count = stage5_run_count(runs[i]);
+                count += run_count;
+                run_lengths.push_back(run_count);
             }
             gathered.resize(count + 8u);
             size_t gathered_pos = 0;
@@ -1900,10 +2000,9 @@ bool write_materialized_runs_to_sa(const Stage5InputView& view,
                                             : static_cast<size_t>(run_count) * 4u);
                 gathered_pos += run_count;
             }
-            std::sort(gathered.begin(), gathered.begin() + count,
-                      [&](uint32_t a, uint32_t b) {
-                          return suffix_less_after_key(view, a, b);
-                      });
+            gathered.resize(count);
+            merge_equal_key_runs_after_key(view, &gathered, &merge_positions,
+                                           &run_lengths, &next_run_lengths);
             std::memcpy(out + out_pos * 4u, gathered.data(), count * 4u);
             out_pos += count;
         }

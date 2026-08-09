@@ -1594,28 +1594,75 @@ bool emit_materialized_group_run(const Stage4InputView& view,
               });
     for (uint32_t i = 0; i < group_count; ++i) order[i] -= 255u;
 
+    /* Most 256-byte columns are shared by every group. Build the equality
+     * mask once so common runs need one key load and no stable re-sort. */
+    uint32_t equal_columns[8];
+#if defined(__AVX2__) || defined(_M_AVX2)
+    const uint8_t* first_group = view.data + base;
+    const __m256i all_equal = _mm256_set1_epi32(-1);
+    for (uint32_t lane = 0; lane < 8; ++lane) {
+        const __m256i first = _mm256_loadu_si256(
+            reinterpret_cast<const __m256i*>(first_group + lane * 32u));
+        __m256i equal = all_equal;
+        for (uint32_t group = 1; group < group_count; ++group) {
+            const __m256i current = _mm256_loadu_si256(
+                reinterpret_cast<const __m256i*>(
+                    first_group + (group << 8) + lane * 32u));
+            equal = _mm256_and_si256(equal,
+                                     _mm256_cmpeq_epi8(first, current));
+        }
+        equal_columns[lane] =
+            static_cast<uint32_t>(_mm256_movemask_epi8(equal));
+    }
+#else
+    std::fill(std::begin(equal_columns), std::end(equal_columns), ~0u);
+    for (uint32_t rel = 0; rel < 256; ++rel) {
+        const uint8_t first = view.data[base + rel];
+        for (uint32_t group = 1; group < group_count; ++group) {
+            if (view.data[base + (group << 8) + rel] != first) {
+                equal_columns[rel >> 5] &= ~(1u << (rel & 31u));
+                break;
+            }
+        }
+    }
+#endif
+    const auto column_is_equal = [&](uint32_t rel) {
+        return (equal_columns[rel >> 5] >> (rel & 31u)) & 1u;
+    };
+
     const bool padded = has_load24_padding(view);
     for (int rel = 255; rel >= 0; --rel) {
         const uint32_t relu = static_cast<uint32_t>(rel);
-        uint32_t group_start = 0;
-        while (group_start < group_count) {
-            const uint32_t key =
-                load24_fast(view, order[group_start] + relu, padded);
-            uint32_t group_end = group_start + 1;
-            while (group_end < group_count &&
-                   load24_fast(view, order[group_end] + relu, padded) == key) {
-                ++group_end;
-            }
-            if (!append_materialized_run(
-                    scratch, key, order.data(), group_start,
-                    group_end - group_start, relu)) {
+        if (relu <= 253u && column_is_equal(relu) &&
+            column_is_equal(relu + 1u) && column_is_equal(relu + 2u)) {
+            const uint32_t key = load24_fast(view, base + relu, padded);
+            if (!append_materialized_run(scratch, key, order.data(), 0,
+                                         group_count, relu)) {
                 return false;
             }
-            group_start = group_end;
+        } else {
+            uint32_t group_start = 0;
+            while (group_start < group_count) {
+                const uint32_t key =
+                    load24_fast(view, order[group_start] + relu, padded);
+                uint32_t group_end = group_start + 1;
+                while (group_end < group_count &&
+                       load24_fast(view, order[group_end] + relu, padded) ==
+                           key) {
+                    ++group_end;
+                }
+                if (!append_materialized_run(
+                        scratch, key, order.data(), group_start,
+                        group_end - group_start, relu)) {
+                    return false;
+                }
+                group_start = group_end;
+            }
         }
 
         if (rel > 0) {
             const uint32_t next_rel = relu - 1u;
+            if (column_is_equal(next_rel)) continue;
             for (uint32_t i = 1; i < group_count; ++i) {
                 const uint32_t origin = order[i];
                 const uint8_t key = view.data[origin + next_rel];

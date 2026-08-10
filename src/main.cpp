@@ -1,5 +1,5 @@
 /*
- * main.cpp -- DIRTYBIRD Miner entry point
+ * main.cpp -- DIRTYBIRD C Miner entry point
  *
  * Clean-room DERO miner. AstroBWT v3.
  * No Boost. No nlohmann. Just pthreads and sockets.
@@ -173,7 +173,7 @@ static void reporter_thread()
 		double rate, avg;
 		hashrate.sample(now, total, rate, avg);
 
-		/* Colored [DIRTYBIRD] status line (the format users liked). Fields:
+		/* Colored [DIRTYBIRD-C] status line (the format users liked). Fields:
 		 *   Height     = G.height   (atomic display snapshot)
 		 *   Miniblocks = G.accepted (daemon "miniblocks" accepted)
 		 *   Blocks     = G.blocks   (daemon integrator/full "blocks")
@@ -227,7 +227,7 @@ static void reporter_thread()
 			}
 		} else {
 			/* Redirected to a file/pipe: same fields, no ANSI, newline-terminated. */
-			printf("[DIRTYBIRD] %.2f KH/s (%.2f KH/s avg) | Height:%lld | "
+			printf("[DIRTYBIRD-C] %.2f KH/s (%.2f KH/s avg) | Height:%lld | "
 			       "Miniblocks:%lld | Blocks:%lld | REJ:%lld | Diff:%s | "
 			       "%02d:%02d:%02d\n",
 			       rate, avg, (long long)G.height.load(std::memory_order_relaxed),
@@ -272,8 +272,8 @@ static void reporter_thread()
 
 /* --- CLI --- */
 
-#ifndef DIRTYBIRD_VERSION_STR
-#define DIRTYBIRD_VERSION_STR "dev"
+#ifndef DIRTYBIRD_C_VERSION_STR
+#define DIRTYBIRD_C_VERSION_STR "dev"
 #endif
 
 static void print_usage(FILE *out, const char *argv0)
@@ -352,7 +352,7 @@ static void parse_args(int argc, char **argv)
 			print_usage(stdout, argv[0]);
 			exit(0);
 		} else if (!strcmp(argv[i], "-v") || !strcmp(argv[i], "--version")) {
-			printf("Dirtybird Miner v%s\n", DIRTYBIRD_VERSION_STR);
+			printf("Dirtybird C Miner v%s\n", DIRTYBIRD_C_VERSION_STR);
 			exit(0);
 		} else {
 			usage(argv[0]);
@@ -485,7 +485,7 @@ int main(int argc, char **argv)
 
 	parse_args(argc, argv);
 
-	log_line("INFO", "Dirtybird Miner");
+	log_line("INFO", "Dirtybird C Miner");
 	log_line("INFO", "Server:  %s:%d", G.host.c_str(), G.port);
 	log_line("INFO", "Wallet:  %s", G.wallet.c_str());
 	log_line("INFO", "Threads: %d", G.nthreads);

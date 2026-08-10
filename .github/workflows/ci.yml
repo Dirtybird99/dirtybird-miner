@@ -24,15 +24,15 @@ jobs:
         include:
           - name: Windows
             os: windows-latest
-            artifact_name: dirtybird-miner-windows-bin
+            artifact_name: dirtybird-c-miner-windows-bin
             artifact_path: build/bin/*
           - name: Linux
             os: ubuntu-latest
-            artifact_name: dirtybird-miner-linux-bin
+            artifact_name: dirtybird-c-miner-linux-bin
             artifact_path: build/bin/*
           - name: macOS
             os: macos-latest
-            artifact_name: dirtybird-miner-macos-bin
+            artifact_name: dirtybird-c-miner-macos-bin
             artifact_path: build/bin/*
     steps:
       - name: Checkout
@@ -125,26 +125,26 @@ jobs:
       - name: Smoke test (Windows)
         if: runner.os == 'Windows'
         shell: msys2 {0}
-        run: ./build/bin/dirtybird-miner-cpu.exe --help > /dev/null
+        run: ./build/bin/dirtybird-c-miner.exe --help > /dev/null
 
       - name: Smoke test (Linux/macOS)
         if: runner.os != 'Windows'
-        run: ./build/bin/dirtybird-miner-cpu --help > /dev/null
+        run: ./build/bin/dirtybird-c-miner --help > /dev/null
 
       - name: Package verification (Linux)
         if: runner.os == 'Linux'
         run: |
           bash ./scripts/release.sh v0.0.0-ci build dist
-          tar -tzf dist/dirtybird-miner-amd64-v0.0.0-ci.tar.gz | grep -q 'dirtybird-miner-amd64-v0.0.0-ci/dirtybird-miner-cpu'
+          tar -tzf dist/dirtybird-c-miner-amd64-v0.0.0-ci.tar.gz | grep -q 'dirtybird-c-miner-amd64-v0.0.0-ci/dirtybird-c-miner'
 
       - name: Self-test (Windows)
         if: runner.os == 'Windows'
         shell: msys2 {0}
-        run: ./build/bin/dirtybird-miner-cpu.exe --selftest
+        run: ./build/bin/dirtybird-c-miner.exe --selftest
 
       - name: Self-test (Linux/macOS)
         if: runner.os != 'Windows'
-        run: ./build/bin/dirtybird-miner-cpu --selftest
+        run: ./build/bin/dirtybird-c-miner --selftest
 
       - name: Upload binaries
         uses: actions/upload-artifact@v4
@@ -182,20 +182,20 @@ jobs:
               -DCMAKE_BUILD_TYPE=Release \
               -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
             cmake --build build-arm64 \
-              --target dirtybird-miner-cpu dirtybird-pgo-train test_stage5_descriptor \
+              --target dirtybird-c-miner dirtybird-c-pgo-train test_stage5_descriptor \
               --parallel
             echo "=== arch: $(uname -m) ==="
             echo "=== pow(a) KAT (native arm64) ==="
-            ./build-arm64/bin/dirtybird-miner-cpu --selftest
+            ./build-arm64/bin/dirtybird-c-miner --selftest
             echo "=== stage5 descriptor ==="
             ./build-arm64/bin/test_stage5_descriptor
             echo "=== benchmark warmup ==="
-            ./build-arm64/bin/dirtybird-pgo-train \
+            ./build-arm64/bin/dirtybird-c-pgo-train \
               -t 1 --warmup-seconds 1 --seconds 1 --rotate-ms 0 |
               tee benchmark.log
             grep -Eq "^benchmark_result threads=1 warmup_s=1 elapsed_s=[0-9.]+ hashes=[1-9][0-9]* kh_s=[0-9.]+" benchmark.log
             echo "=== profiler unit ==="
-            DLUNA_PROFILE=1 ./build-arm64/bin/dirtybird-pgo-train \
+            DLUNA_PROFILE=1 ./build-arm64/bin/dirtybird-c-pgo-train \
               -t 1 --seconds 300 --hashes 1024 --rotate-ms 0 |
               tee profiler.log
             grep -Eq "^\[PROF tid=.* ns/hash=[1-9][0-9]*" profiler.log
@@ -243,7 +243,7 @@ jobs:
             -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=BOTH \
             -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=BOTH \
             -DCMAKE_FIND_ROOT_PATH_MODE_PACKAGE=BOTH \
-            -DDIRTYBIRD_VERSION=0.0.0-ci
+            -DDIRTYBIRD_C_VERSION=0.0.0-ci
 
       - name: Verify Android excludes x86 SHA shim
         run: |
@@ -255,14 +255,14 @@ jobs:
       - name: Build
         run: |
           cmake --build build-android \
-            --target dirtybird-miner-cpu dirtybird-pgo-train \
+            --target dirtybird-c-miner dirtybird-c-pgo-train \
             --parallel
 
       - name: Verify ELFs (aarch64)
         run: |
           NDK="${ANDROID_NDK_LATEST_HOME:-$ANDROID_NDK_HOME}"
           READELF="$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf"
-          for binary in dirtybird-miner-cpu dirtybird-pgo-train; do
+          for binary in dirtybird-c-miner dirtybird-c-pgo-train; do
             "$READELF" -h "build-android/bin/$binary" |
               grep -q 'Machine:.*AArch64'
           done
@@ -270,10 +270,10 @@ jobs:
       - name: Upload Android test binaries
         uses: actions/upload-artifact@v4
         with:
-          name: dirtybird-miner-android-arm64-ci
+          name: dirtybird-c-miner-android-arm64-ci
           path: |
-            build-android/bin/dirtybird-miner-cpu
-            build-android/bin/dirtybird-pgo-train
+            build-android/bin/dirtybird-c-miner
+            build-android/bin/dirtybird-c-pgo-train
           retention-days: 7
 
   lint:

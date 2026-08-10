@@ -1,5 +1,5 @@
 /*
- * astrobwt.cpp -- AstroBWT v3 hash function (DIRTYBIRD Miner)
+ * astrobwt.cpp -- AstroBWT v3 hash function (DIRTYBIRD C Miner)
  *
  * Pipeline: Input(48B) -> SHA256 -> Salsa20(expand 32B key to 256B)
  *           -> RC4(KSA+PRGA 256B) -> FNV-1a -> wolfCompute(278 iter)

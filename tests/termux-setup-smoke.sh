@@ -11,7 +11,7 @@ TEST_DIR="$(mktemp -d)"
 trap 'rm -rf -- "$TEST_DIR"' EXIT
 
 FAKE_BIN="$TEST_DIR/bin"
-INSTALL_DIR="$TEST_DIR/home/dirtybird-miner"
+INSTALL_DIR="$TEST_DIR/home/dirtybird-c-miner"
 mkdir -p "$FAKE_BIN" "$INSTALL_DIR"
 
 cat > "$FAKE_BIN/uname" <<'EOF'
@@ -67,11 +67,11 @@ cat > "$FAKE_BIN/termux-wake-unlock" <<'EOF'
 touch "$TEST_UNLOCK_MARKER"
 EOF
 
-cat > "$INSTALL_DIR/dirtybird-miner-cpu" <<'EOF'
+cat > "$INSTALL_DIR/dirtybird-c-miner" <<'EOF'
 #!/usr/bin/env bash
 if [ "$#" -eq 1 ] && [ "$1" = "--version" ]; then
     printf '%s\n' "--version" >> "$TEST_INVOCATION_LOG"
-    printf 'Dirtybird Miner v1.0.29\n'
+    printf 'Dirtybird C Miner v1.0.29\n'
 elif [ "$#" -eq 0 ]; then
     printf '%s\n' "<run>" >> "$TEST_INVOCATION_LOG"
 else
@@ -90,7 +90,7 @@ cat > "$INSTALL_DIR/config.json" <<'EOF'
 EOF
 
 printf 'v1.0.29\n' > "$INSTALL_DIR/.installed_version"
-chmod +x "$FAKE_BIN"/* "$INSTALL_DIR/dirtybird-miner-cpu"
+chmod +x "$FAKE_BIN"/* "$INSTALL_DIR/dirtybird-c-miner"
 
 export TEST_INVOCATION_LOG="$TEST_DIR/invocations.log"
 export TEST_UNLOCK_MARKER="$TEST_DIR/unlocked"
@@ -114,11 +114,11 @@ OUTPUT="$(
         bash "$ROOT/scripts/termux-setup.sh" 2>&1
 )"
 
-assert_contains "$OUTPUT" "Update available: Dirtybird Miner v1.0.29 -> Dirtybird Miner v1.0.30."
+assert_contains "$OUTPUT" "Update available: Dirtybird C Miner v1.0.29 -> Dirtybird C Miner v1.0.30."
 assert_contains "$OUTPUT" "Update before benchmarking:"
 assert_contains "$OUTPUT" "curl -fsSL https://raw.githubusercontent.com/Dirtybird99/Dirtybird-C-Miner/master/scripts/termux-setup.sh | bash -s -- --update"
 PLAIN_OUTPUT="$(printf '%s\n' "$OUTPUT" | sed $'s/\033\\[[0-9;]*m//g')"
-assert_contains "$PLAIN_OUTPUT" "  Version:  Dirtybird Miner v1.0.29"
+assert_contains "$PLAIN_OUTPUT" "  Version:  Dirtybird C Miner v1.0.29"
 assert_contains "$OUTPUT" "Could not acquire wake-lock. Android Doze may pause the miner in background."
 assert_not_contains "$OUTPUT" "running on battery power"
 assert_not_contains "$OUTPUT" "Thermal throttling"

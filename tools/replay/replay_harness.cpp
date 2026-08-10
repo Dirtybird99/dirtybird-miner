@@ -1,4 +1,4 @@
-// replay_harness.cpp - Main entry for dirtybird-miner-cpu-replay.
+// replay_harness.cpp - Main entry for dirtybird-c-miner-replay.
 
 #include "cap_format.h"
 #include "report.h"
@@ -84,7 +84,7 @@ static bool parse_args(int argc, char** argv, Args* args) {
                 pos = comma + 1;
             }
         } else if (s == "-h" || s == "--help") {
-            std::printf("Usage: dirtybird-miner-cpu-replay --captures DIR --report-out DIR "
+            std::printf("Usage: dirtybird-c-miner-replay --captures DIR --report-out DIR "
                         "[--stages 1-6] [--max-diffs 16]\n");
             std::exit(0);
         } else {

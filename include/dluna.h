@@ -1,5 +1,5 @@
 /*
- * dluna.h -- DIRTYBIRD Miner master header
+ * dluna.h -- DIRTYBIRD C Miner master header
  *
  * The entire miner's public interface in one file.
  * No forward declarations scattered across 12 headers.

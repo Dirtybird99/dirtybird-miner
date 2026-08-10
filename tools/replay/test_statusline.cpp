@@ -140,7 +140,7 @@ int main()
 		dluna_format_status(buf, sizeof buf, st, 0);
 		char legacy[512];
 		std::snprintf(legacy, sizeof legacy,
-		              "\r\033[93m[DIRTYBIRD] \033[92m%.2f KH/s\033[97m "
+		              "\r\033[93m[DIRTYBIRD-C] \033[92m%.2f KH/s\033[97m "
 		              "(\033[32m%.2f KH/s avg\033[97m) | \033[34mHeight:%lld\033[97m | "
 		              "\033[36mMiniblocks:%lld\033[97m | \033[32mBlocks:%lld\033[97m | "
 		              "%sREJ:%lld\033[97m | \033[35mDiff:%s\033[97m | "
@@ -154,8 +154,8 @@ int main()
 
 		bool intact = false;
 		full_width_ref = visible_width(std::string(buf), &intact);
-		CHECK(full_width_ref == 115,
-		      "screenshot case should be 115 visible columns, got %d",
+		CHECK(full_width_ref == 117,
+		      "screenshot case should be 117 visible columns, got %d",
 		      full_width_ref);
 	}
 
@@ -188,14 +188,14 @@ int main()
 	}
 
 	/* Two dluna_term_cols() branches are reachable from ctest, one per test
-	 * registration: `statusline_env_cols` sets DIRTYBIRD_COLS and pins the
+	 * registration: `statusline_env_cols` sets DIRTYBIRD_C_COLS and pins the
 	 * override (the escape hatch for setups where the ioctl reports 0), while
 	 * plain `statusline` leaves it unset and lands on the query-failed
 	 * fallback, because ctest gives us a pipe rather than a real terminal. */
-	if (const char *env = std::getenv("DIRTYBIRD_COLS")) {
+	if (const char *env = std::getenv("DIRTYBIRD_C_COLS")) {
 		int want = std::atoi(env);
 		int got  = dluna_term_cols();
-		CHECK(got == want, "DIRTYBIRD_COLS=%s but dluna_term_cols() == %d",
+		CHECK(got == want, "DIRTYBIRD_C_COLS=%s but dluna_term_cols() == %d",
 		      env, got);
 
 		char buf[512];
@@ -204,7 +204,7 @@ int main()
 		int vis = visible_width(std::string(buf), &intact);
 		CHECK(intact && vis <= got - 1,
 		      "override width %d rendered %d columns", got, vis);
-		std::printf("statusline: DIRTYBIRD_COLS=%d honored (%d columns)\n",
+		std::printf("statusline: DIRTYBIRD_C_COLS=%d honored (%d columns)\n",
 		            got, vis);
 	} else {
 		/* No override: this is the width-query-failed path. g_tty is still its

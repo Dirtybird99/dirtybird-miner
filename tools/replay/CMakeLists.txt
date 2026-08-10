@@ -1,16 +1,16 @@
 # tools/replay - v1.14 parity-sweep harness and tests.
 
-add_executable(dirtybird-miner-cpu-replay
+add_executable(dirtybird-c-miner-replay
     replay_harness.cpp
     report.cpp
     replay_globals.cpp
 )
-target_include_directories(dirtybird-miner-cpu-replay PRIVATE
+target_include_directories(dirtybird-c-miner-replay PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_SOURCE_DIR}/include
 )
-target_link_libraries(dirtybird-miner-cpu-replay PRIVATE dluna_stages)
-dluna_copy_runtime_dlls(dirtybird-miner-cpu-replay)
+target_link_libraries(dirtybird-c-miner-replay PRIVATE dluna_stages)
+dluna_copy_runtime_dlls(dirtybird-c-miner-replay)
 
 add_executable(bench_stage5 bench_stage5.cpp replay_globals.cpp)
 target_include_directories(bench_stage5 PRIVATE
@@ -108,7 +108,7 @@ dluna_copy_runtime_dlls(test_share_queue)
 
 add_test(NAME cap_format COMMAND test_cap_format)
 # Runs from the binary output dir, not this target's build dir: the test shells
-# out to "./dirtybird-miner-cpu-replay" by relative path, and every executable
+# out to "./dirtybird-c-miner-replay" by relative path, and every executable
 # lands in ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}.
 add_test(NAME self_diff
     COMMAND test_self_diff
@@ -147,7 +147,7 @@ endif()
 add_test(NAME statusline COMMAND test_statusline)
 add_test(NAME statusline_env_cols COMMAND test_statusline)
 set_tests_properties(statusline_env_cols PROPERTIES
-    ENVIRONMENT "DIRTYBIRD_COLS=56"
+    ENVIRONMENT "DIRTYBIRD_C_COLS=56"
 )
 add_test(NAME sleep_ms COMMAND test_sleep_ms)
 add_test(NAME share_queue COMMAND test_share_queue)

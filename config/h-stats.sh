@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-. /hive/miners/custom/dirtybird/h-manifest.conf
+. "$(dirname "${BASH_SOURCE[0]}")/h-manifest.conf"
 
-# NOTE: dirtybird-miner-cpu has no HTTP stats API yet. Until --api-listen lands,
+# NOTE: dirtybird-c-miner has no HTTP stats API yet. Until --api-listen lands,
 # HiveOS shows the rig as running with 0 H/s. Mining is unaffected.
 khs=0
 stats=$(cat <<-END

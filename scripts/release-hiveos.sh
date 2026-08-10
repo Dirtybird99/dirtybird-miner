@@ -1,6 +1,6 @@
 #!/bin/bash
 # Package the Linux amd64 binary as a HiveOS / MMPOS custom-miner archive.
-# Layout: <pkg>/{dirtybird-miner-cpu, lib/, h-manifest.conf, h-config.sh, h-run.sh, h-stats.sh}.
+# Layout: <pkg>/{dirtybird-c-miner, lib/, h-manifest.conf, h-config.sh, h-run.sh, h-stats.sh}.
 set -euo pipefail
 
 if [[ $# -lt 1 || $# -gt 3 ]]; then
@@ -15,11 +15,11 @@ OUTPUT_DIR="${3:-dist}"
 [[ -z "$VERSION" ]] && { echo "Version cannot be empty." >&2; exit 1; }
 
 ASSET_VERSION="v$VERSION"
-BINARY_NAME="dirtybird-miner-cpu"
+BINARY_NAME="dirtybird-c-miner"
 BIN_DIR="$REPO_ROOT/$BUILD_DIR/bin"
 BINARY_PATH="$BIN_DIR/$BINARY_NAME"
 STAGE_ROOT="$REPO_ROOT/$OUTPUT_DIR"
-PACKAGE_NAME="dirtybird-miner-${ASSET_VERSION}_linux_hiveos_mmpos"
+PACKAGE_NAME="dirtybird-c-miner-${ASSET_VERSION}_linux_hiveos_mmpos"
 PACKAGE_DIR="$STAGE_ROOT/$PACKAGE_NAME"
 ARCHIVE_PATH="$STAGE_ROOT/$PACKAGE_NAME.tar.gz"
 LIB_DIR="$PACKAGE_DIR/lib"
@@ -43,7 +43,7 @@ cp "$BINARY_PATH" "$PACKAGE_DIR/"; chmod +x "$PACKAGE_DIR/$BINARY_NAME"
 # bundle non-core shared libs and set rpath to ./lib
 while IFS= read -r line; do
     if [[ "$line" =~ ^[[:space:]]*([^[:space:]]+)[[:space:]]+\=\>[[:space:]]+([^[:space:]]+)[[:space:]]+\(0x[0-9a-fA-F]+\)$ ]]; then
-        so="${BASH_REMATCH[1]}"; p="${BASH_REMATCH[2]}"
+        so="$(basename "${BASH_REMATCH[1]}")"; p="${BASH_REMATCH[2]}"
         should_bundle "$so" || continue
         install -m 0644 "$(readlink -f "$p")" "$LIB_DIR/$so"
     fi
@@ -60,5 +60,5 @@ chmod +x "$PACKAGE_DIR"/h-*.sh
 [[ -f "$REPO_ROOT/LICENSE" ]]   && cp "$REPO_ROOT/LICENSE"   "$PACKAGE_DIR/"
 
 rm -f "$ARCHIVE_PATH"
-tar -czf "$ARCHIVE_PATH" -C "$STAGE_ROOT" "$PACKAGE_NAME"
+tar -czf "$ARCHIVE_PATH" -C "$PACKAGE_DIR" .
 echo "Created package: $ARCHIVE_PATH"

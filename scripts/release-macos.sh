@@ -1,8 +1,8 @@
 #!/bin/bash
 # Package the Apple Silicon macOS binary.
 # Expects a binary with OpenSSL statically linked (OPENSSL_USE_STATIC_LIBS) at
-# <build-dir>/bin/dirtybird-miner-cpu, so the package needs no bundled dylibs.
-# Layout: <pkg>/{dirtybird-miner-cpu, config.json, config.json.example,
+# <build-dir>/bin/dirtybird-c-miner, so the package needs no bundled dylibs.
+# Layout: <pkg>/{dirtybird-c-miner, config.json, config.json.example,
 # start.sh, README.md, LICENSE, QUICKSTART.txt}.
 set -euo pipefail
 
@@ -18,10 +18,10 @@ OUTPUT_DIR="${3:-dist}"
 [[ -z "$VERSION" ]] && { echo "Version cannot be empty." >&2; exit 1; }
 
 ASSET_VERSION="v$VERSION"
-BINARY_NAME="dirtybird-miner-cpu"
+BINARY_NAME="dirtybird-c-miner"
 BINARY_PATH="$REPO_ROOT/$BUILD_DIR/bin/$BINARY_NAME"
 STAGE_ROOT="$REPO_ROOT/$OUTPUT_DIR"
-PACKAGE_NAME="dirtybird-miner-macos-arm64-$ASSET_VERSION"
+PACKAGE_NAME="dirtybird-c-miner-macos-arm64-$ASSET_VERSION"
 PACKAGE_DIR="$STAGE_ROOT/$PACKAGE_NAME"
 ARCHIVE_PATH="$STAGE_ROOT/$PACKAGE_NAME.tar.gz"
 
@@ -51,16 +51,16 @@ cat > "$PACKAGE_DIR/start.sh" <<'EOF'
 set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR"
-exec ./dirtybird-miner-cpu "$@"
+exec ./dirtybird-c-miner "$@"
 EOF
 chmod +x "$PACKAGE_DIR/start.sh"
 
 cat > "$PACKAGE_DIR/QUICKSTART.txt" <<EOF
-DIRTYBIRD Miner $ASSET_VERSION (macOS / Apple Silicon)
+DIRTYBIRD C Miner $ASSET_VERSION (macOS / Apple Silicon)
 ======================================================
 
 Contents:
-- dirtybird-miner-cpu   (arm64 binary; OpenSSL statically linked)
+- dirtybird-c-miner   (arm64 binary; OpenSSL statically linked)
 - config.json           (edit this: daemon-address / wallet / threads / priority)
 - config.json.example
 - start.sh
@@ -75,7 +75,7 @@ Quick start:
 
 First run: the binary is not signed or notarized, so Gatekeeper may block it.
 Either right-click > Open once, or clear the quarantine flag:
-  xattr -d com.apple.quarantine ./dirtybird-miner-cpu
+  xattr -d com.apple.quarantine ./dirtybird-c-miner
 
 On macOS, -p max is currently a no-op; priority tuning is Windows-only.
 Startup prints a pow("a") self-test; it must say PASS.

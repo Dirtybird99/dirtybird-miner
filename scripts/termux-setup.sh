@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# DIRTYBIRD Miner -- Termux (Android) setup & launcher.
+# DIRTYBIRD C Miner -- Termux (Android) setup & launcher.
 #
 # Download-only installer: fetches the pre-built aarch64 Android release from
 # GitHub, writes config.json, acquires a wake-lock so Android Doze doesn't kill
@@ -17,10 +17,10 @@ set -euo pipefail
 
 REPO="Dirtybird99/Dirtybird-C-Miner"
 DEFAULT_WALLET="dero1qyvuemd6z0uzsx5ufc99f0jhyzvvpysmrd2t3526ht7a9dfh7jve2qqt0vu5y"
-INSTALL_DIR="$HOME/dirtybird-miner"
-BINARY_NAME="dirtybird-miner-cpu"
+INSTALL_DIR="$HOME/dirtybird-c-miner"
+BINARY_NAME="dirtybird-c-miner"
 VERSION_FILE=".installed_version"
-ARCHIVE_PREFIX="dirtybird-miner-v"
+ARCHIVE_PREFIX="dirtybird-c-miner-v"
 ARCHIVE_SUFFIX="_aarch64_android.tar.gz"
 
 # ── daemon / pool menu ────────────────────────────────────────────────────────
@@ -83,7 +83,7 @@ UNINSTALL=false
 
 usage() {
     cat <<'USAGE'
-DIRTYBIRD Miner -- Termux (Android) setup & launcher.
+DIRTYBIRD C Miner -- Termux (Android) setup & launcher.
 
 Downloads the pre-built aarch64 Android release, writes config.json, acquires a
 wake-lock so Android Doze doesn't pause mining, and runs with auto-restart.
@@ -131,7 +131,7 @@ if [ "$IS_ANDROID" = true ]; then
 else
     err "This script is for Android/Termux only."
     err "On Linux x86_64, use the amd64 release:"
-    err "  https://github.com/$REPO/releases  (dirtybird-miner-amd64-v*.tar.gz)"
+    err "  https://github.com/$REPO/releases  (dirtybird-c-miner-amd64-v*.tar.gz)"
     exit 1
 fi
 
@@ -259,8 +259,8 @@ if ! BINARY_VERSION="$(./"$BINARY_NAME" --version 2>/dev/null)" ||
     exit 1
 fi
 
-if [ -n "$LATEST_TAG" ] && [ "$BINARY_VERSION" != "Dirtybird Miner $LATEST_TAG" ]; then
-    warn "Update available: $BINARY_VERSION -> Dirtybird Miner $LATEST_TAG."
+if [ -n "$LATEST_TAG" ] && [ "$BINARY_VERSION" != "Dirtybird C Miner $LATEST_TAG" ]; then
+    warn "Update available: $BINARY_VERSION -> Dirtybird C Miner $LATEST_TAG."
     warn "Update before benchmarking:"
     note "curl -fsSL https://raw.githubusercontent.com/$REPO/master/scripts/termux-setup.sh | bash -s -- --update"
 fi

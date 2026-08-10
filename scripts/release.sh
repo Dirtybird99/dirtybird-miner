@@ -19,7 +19,7 @@ if [[ -z "$VERSION" ]]; then
 fi
 
 ASSET_VERSION="v$VERSION"
-BINARY_NAME="dirtybird-miner-cpu"
+BINARY_NAME="dirtybird-c-miner"
 BUILD_ROOT="$REPO_ROOT/$BUILD_DIR"
 BIN_DIR="$BUILD_ROOT/bin"
 BINARY_PATH="$BIN_DIR/$BINARY_NAME"
@@ -30,13 +30,13 @@ case "$PACKAGE_ARCH" in
     arm64) CPU_NOTE="64-bit ARMv8 (aarch64) glibc Linux." ;;
     *) echo "Unsupported PACKAGE_ARCH: $PACKAGE_ARCH" >&2; exit 1 ;;
 esac
-PACKAGE_NAME="dirtybird-miner-$PACKAGE_ARCH-$ASSET_VERSION"
+PACKAGE_NAME="dirtybird-c-miner-$PACKAGE_ARCH-$ASSET_VERSION"
 PACKAGE_DIR="$STAGE_ROOT/$PACKAGE_NAME"
 ARCHIVE_PATH="$STAGE_ROOT/$PACKAGE_NAME.tar.gz"
 LIB_DIR="$PACKAGE_DIR/lib"
 
 echo "================================================"
-echo "DIRTYBIRD Miner Linux Packaging"
+echo "DIRTYBIRD C Miner Linux Packaging"
 echo "Version: $ASSET_VERSION"
 echo "================================================"
 
@@ -63,12 +63,12 @@ bundle_runtime_libs() {
     local -a missing_libs=()
     while IFS= read -r line; do
         if [[ "$line" =~ ^[[:space:]]*([^[:space:]]+)[[:space:]]+\=\>[[:space:]]+not[[:space:]]+found$ ]]; then
-            soname="${BASH_REMATCH[1]}"
+            soname="$(basename "${BASH_REMATCH[1]}")"
             should_bundle_runtime "$soname" && missing_libs+=("$soname")
             continue
         fi
         if [[ "$line" =~ ^[[:space:]]*([^[:space:]]+)[[:space:]]+\=\>[[:space:]]+([^[:space:]]+)[[:space:]]+\(0x[0-9a-fA-F]+\)$ ]]; then
-            soname="${BASH_REMATCH[1]}"; actual_path="${BASH_REMATCH[2]}"
+            soname="$(basename "${BASH_REMATCH[1]}")"; actual_path="${BASH_REMATCH[2]}"
             should_bundle_runtime "$soname" || continue
             resolved_path="$(readlink -f "$actual_path")"
             install -m 0644 "$resolved_path" "$output_dir/$soname"
@@ -116,16 +116,16 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 export LD_LIBRARY_PATH="$SCRIPT_DIR/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 cd "$SCRIPT_DIR"
-exec ./dirtybird-miner-cpu "$@"
+exec ./dirtybird-c-miner "$@"
 EOF
 chmod +x "$PACKAGE_DIR/start.sh"
 
 cat > "$PACKAGE_DIR/QUICKSTART.txt" <<EOF
-DIRTYBIRD Miner $ASSET_VERSION
+DIRTYBIRD C Miner $ASSET_VERSION
 ==============================
 
 Contents:
-- dirtybird-miner-cpu
+- dirtybird-c-miner
 - lib/          (bundled runtime libraries)
 - config.json   (edit this: daemon-address / wallet / threads / priority)
 - config.json.example

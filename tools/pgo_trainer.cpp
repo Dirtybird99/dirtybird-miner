@@ -49,7 +49,7 @@ static int parse_int_arg(const char* value, const char* name) {
     long parsed = std::strtol(value, &end, 10);
     if (!value[0] || (end && *end)) {
         std::fprintf(stderr, "invalid %s: %s\n", name, value);
-        usage("dirtybird-pgo-train");
+        usage("dirtybird-c-pgo-train");
     }
     return static_cast<int>(parsed);
 }
@@ -59,7 +59,7 @@ static uint64_t parse_u64_arg(const char* value, const char* name) {
     unsigned long long parsed = std::strtoull(value, &end, 10);
     if (!value[0] || (end && *end)) {
         std::fprintf(stderr, "invalid %s: %s\n", name, value);
-        usage("dirtybird-pgo-train");
+        usage("dirtybird-c-pgo-train");
     }
     return static_cast<uint64_t>(parsed);
 }

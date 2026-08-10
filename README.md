@@ -1,4 +1,4 @@
-# DIRTYBIRD Miner
+# DIRTYBIRD C Miner
 
 High-performance AstroBWTv3 CPU miner for DERO. Clean-room C++ (no Boost; pthreads + sockets),
 descriptor-SA pipeline with optional profile-guided optimization (PGO).
@@ -13,7 +13,7 @@ Toolchain: clang + lld, CMake, OpenSSL. On Windows use MSYS2 MINGW64.
 ```bash
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
-cmake --build build --target dirtybird-miner-cpu
+cmake --build build --target dirtybird-c-miner
 ```
 
 For the fastest binary, use the two-pass PGO flow documented in `build.sh` / `CMakeLists.txt`.
@@ -35,7 +35,7 @@ bundled `start.bat`/`start.sh` runs the miner with no flags so it picks up `conf
 ```
 
 ```
-dirtybird-miner-cpu [-d <host:port>] [-w <wallet>] [-t <threads>] [-p normal|max]
+dirtybird-c-miner [-d <host:port>] [-w <wallet>] [-t <threads>] [-p normal|max]
 ```
 
 | flag | meaning |

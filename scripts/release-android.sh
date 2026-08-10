@@ -1,7 +1,7 @@
 #!/bin/bash
 # Package the NDK-built aarch64 Android (Bionic) binary.
 # Expects a standalone binary (ANDROID_STL=c++_static, static OpenSSL) at
-# <build-dir>/bin/dirtybird-miner-cpu. Layout: <pkg>/{dirtybird-miner-cpu,
+# <build-dir>/bin/dirtybird-c-miner. Layout: <pkg>/{dirtybird-c-miner,
 # README.md, LICENSE, QUICKSTART.txt}.
 set -euo pipefail
 
@@ -17,10 +17,10 @@ OUTPUT_DIR="${3:-dist}"
 [[ -z "$VERSION" ]] && { echo "Version cannot be empty." >&2; exit 1; }
 
 ASSET_VERSION="v$VERSION"
-BINARY_NAME="dirtybird-miner-cpu"
+BINARY_NAME="dirtybird-c-miner"
 BINARY_PATH="$REPO_ROOT/$BUILD_DIR/bin/$BINARY_NAME"
 STAGE_ROOT="$REPO_ROOT/$OUTPUT_DIR"
-PACKAGE_NAME="dirtybird-miner-${ASSET_VERSION}_aarch64_android"
+PACKAGE_NAME="dirtybird-c-miner-${ASSET_VERSION}_aarch64_android"
 PACKAGE_DIR="$STAGE_ROOT/$PACKAGE_NAME"
 ARCHIVE_PATH="$STAGE_ROOT/$PACKAGE_NAME.tar.gz"
 
@@ -34,16 +34,16 @@ chmod +x "$PACKAGE_DIR/$BINARY_NAME"
 [[ -f "$REPO_ROOT/LICENSE" ]]   && cp "$REPO_ROOT/LICENSE"   "$PACKAGE_DIR/"
 
 cat > "$PACKAGE_DIR/QUICKSTART.txt" <<EOF
-DIRTYBIRD Miner $ASSET_VERSION (aarch64 / Android)
+DIRTYBIRD C Miner $ASSET_VERSION (aarch64 / Android)
 ==================================================
 
 Contents:
-- dirtybird-miner-cpu   (standalone aarch64 binary; static libc++ + OpenSSL)
+- dirtybird-c-miner   (standalone aarch64 binary; static libc++ + OpenSSL)
 - README.md, LICENSE
 
 Run (Termux or adb shell):
-  chmod +x ./dirtybird-miner-cpu
-  ./dirtybird-miner-cpu -d <daemon host:port> -w <your DERO wallet> -t <threads>
+  chmod +x ./dirtybird-c-miner
+  ./dirtybird-c-miner -d <daemon host:port> -w <your DERO wallet> -t <threads>
 
 On Android, -p max is currently a no-op; priority tuning is Windows-only.
 Use -t <threads> to balance hashrate, temperature, and battery use.

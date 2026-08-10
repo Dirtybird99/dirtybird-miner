@@ -1,5 +1,5 @@
 /*
- * console.cpp -- coordinated console output for DIRTYBIRD Miner
+ * console.cpp -- coordinated console output for DIRTYBIRD C Miner
  *
  * One mutex serializes every write to the console so timestamped event lines
  * (log_line) never corrupt the in-place status line drawn by the reporter
@@ -81,7 +81,7 @@ int dluna_term_cols(void)
 {
 	/* Explicit override wins: TIOCGWINSZ reports 0 under some HiveOS/MMPOS
 	 * and detached-screen setups, and tests want a deterministic width. */
-	if (const char *env = std::getenv("DIRTYBIRD_COLS")) {
+	if (const char *env = std::getenv("DIRTYBIRD_C_COLS")) {
 		long v = std::strtol(env, nullptr, 10);
 		if (v > 0 && v < 10000)
 			return (int)v;
@@ -126,7 +126,7 @@ namespace {
 
 /* Per-field colours, identical across every layout so it still reads as the
  * same miner when it shrinks. */
-#define C_LABEL  "\033[93m"   /* [DIRTYBIRD] / [DB]  bright yellow */
+#define C_LABEL  "\033[93m"   /* [DIRTYBIRD-C] / [DB]  bright yellow */
 #define C_RATE   "\033[92m"   /* instantaneous KH/s  bright green  */
 #define C_TEXT   "\033[97m"   /* separators          bright white  */
 #define C_AVG    "\033[32m"   /* average KH/s        green         */
@@ -190,8 +190,8 @@ void render_tier(LineBuf &lb, const DlunaStatus &s, int tier)
 
 	lb_esc(lb, "\r");
 	switch (tier) {
-	case TIER_FULL:  /* byte-identical to the pre-1.0.26 line */
-		lb_esc(lb, C_LABEL);  lb_txt(lb, "[DIRTYBIRD] ");
+	case TIER_FULL:  /* the canonical full line (rebranded label) */
+		lb_esc(lb, C_LABEL);  lb_txt(lb, "[DIRTYBIRD-C] ");
 		lb_esc(lb, C_RATE);   lb_txt(lb, "%.2f KH/s", s.rate);
 		lb_esc(lb, C_TEXT);   lb_txt(lb, " (");
 		lb_esc(lb, C_AVG);    lb_txt(lb, "%.2f KH/s avg", s.avg);
@@ -209,7 +209,7 @@ void render_tier(LineBuf &lb, const DlunaStatus &s, int tier)
 		lb_esc(lb, C_TIME);   lb_txt(lb, "%02d:%02d:%02d", s.hh, s.mm, s.ss);
 		break;
 	case TIER_MEDIUM:  /* abbreviated labels, every field kept */
-		lb_esc(lb, C_LABEL);  lb_txt(lb, "[DIRTYBIRD] ");
+		lb_esc(lb, C_LABEL);  lb_txt(lb, "[DIRTYBIRD-C] ");
 		lb_esc(lb, C_RATE);   lb_txt(lb, "%.2f KH/s", s.rate);
 		lb_esc(lb, C_TEXT);   lb_txt(lb, " (");
 		lb_esc(lb, C_AVG);    lb_txt(lb, "%.2f avg", s.avg);
@@ -227,7 +227,7 @@ void render_tier(LineBuf &lb, const DlunaStatus &s, int tier)
 		lb_esc(lb, C_TIME);   lb_txt(lb, "%02d:%02d:%02d", s.hh, s.mm, s.ss);
 		break;
 	case TIER_NARROW:  /* fits the classic 80-column terminal: drops the average */
-		lb_esc(lb, C_LABEL);  lb_txt(lb, "[DIRTYBIRD] ");
+		lb_esc(lb, C_LABEL);  lb_txt(lb, "[DIRTYBIRD-C] ");
 		lb_esc(lb, C_RATE);   lb_txt(lb, "%.2f KH/s", s.rate);
 		lb_esc(lb, C_TEXT);   lb_txt(lb, " | ");
 		lb_esc(lb, C_HEIGHT); lb_txt(lb, "H:%lld", s.height);

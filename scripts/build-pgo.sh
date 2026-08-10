@@ -12,8 +12,8 @@
 #
 # Env knobs (all optional):
 #   BUILD_DIR=build                  final build dir (binary lands in $BUILD_DIR/bin)
-#   TARGET=dirtybird-miner-cpu       executable to produce
-#   TRAIN_TARGET=dirtybird-pgo-train instrumented hashrate trainer
+#   TARGET=dirtybird-c-miner       executable to produce
+#   TRAIN_TARGET=dirtybird-c-pgo-train instrumented hashrate trainer
 #   TRAIN_SECS=60                    trainer runtime for profile collection
 #   TRAIN_THREADS=<nproc>            trainer threads
 #   DIFFICULTY=1000000000            synthetic difficulty (pure hashrate, no shares)
@@ -22,7 +22,7 @@
 #   PGO_PROFILE_IN=""                use this prebuilt merged.profdata; skip gen+train
 #                                    (for cross-compiled targets that can't run here)
 #   PGO_PROFILE_OUT=""               if set, copy the merged profile here (export as artifact)
-#   CMAKE_ARGS=""                    extra cmake args (toolchain file, OpenSSL root, -DDIRTYBIRD_VERSION=...)
+#   CMAKE_ARGS=""                    extra cmake args (toolchain file, OpenSSL root, -DDIRTYBIRD_C_VERSION=...)
 #   GEN_CMAKE_ARGS=""                extra cmake args for the INSTRUMENT pass only
 #                                    (e.g. -DCMAKE_EXE_LINKER_FLAGS=-static so a
 #                                     cross trainer is self-contained and runs
@@ -32,8 +32,8 @@
 set -euo pipefail
 
 BUILD_DIR="${BUILD_DIR:-build}"
-TARGET="${TARGET:-dirtybird-miner-cpu}"
-TRAIN_TARGET="${TRAIN_TARGET:-dirtybird-pgo-train}"
+TARGET="${TARGET:-dirtybird-c-miner}"
+TRAIN_TARGET="${TRAIN_TARGET:-dirtybird-c-pgo-train}"
 TRAIN_SECS="${TRAIN_SECS:-60}"
 DIFFICULTY="${DIFFICULTY:-1000000000}"
 PROFDATA="${PROFDATA:-llvm-profdata}"

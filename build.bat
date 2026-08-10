@@ -1,5 +1,5 @@
 @echo off
-REM DIRTYBIRD Miner — Windows build via MSYS2 MinGW64
+REM DIRTYBIRD C Miner — Windows build via MSYS2 MinGW64
 REM Run from the source root (the directory containing this script).
 
 set PATH=C:\msys64\mingw64\bin;%PATH%
@@ -20,7 +20,7 @@ if %errorlevel% neq 0 (
 )
 
 echo.
-echo === Binary ready: %cd%\dirtybird-miner-cpu.exe ===
+echo === Binary ready: %cd%\dirtybird-c-miner.exe ===
 echo.
 echo Test run:
-echo   dirtybird-miner-cpu.exe -d 127.0.0.1:10100 -w YOUR_WALLET_ADDRESS -t 20
+echo   dirtybird-c-miner.exe -d 127.0.0.1:10100 -w YOUR_WALLET_ADDRESS -t 20

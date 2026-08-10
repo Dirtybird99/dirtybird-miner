@@ -1,4 +1,4 @@
-# DIRTYBIRD Miner -- CMake build
+# DIRTYBIRD C Miner -- CMake build
 #
 # Clean build:
 #   mkdir build && cd build
@@ -8,15 +8,15 @@
 # PGO build (two-pass, local hashrate candidate):
 #   mkdir build-pgo-gen && cd build-pgo-gen
 #   cmake -DPGO_GENERATE=ON ..
-#   cmake --build . --target dirtybird-pgo-train -j2
-#   LLVM_PROFILE_FILE="pgo-%p.profraw" ./dirtybird-pgo-train -t 20 --seconds 60
+#   cmake --build . --target dirtybird-c-pgo-train -j2
+#   LLVM_PROFILE_FILE="pgo-%p.profraw" ./dirtybird-c-pgo-train -t 20 --seconds 60
 #   llvm-profdata merge -o merged.profdata *.profraw
 #   cd .. && mkdir build-pgo-use && cd build-pgo-use
 #   cmake -DPGO_USE=ON -DPGO_PROFILE=../build-pgo-gen/merged.profdata ..
 #   cmake --build . -j$(nproc)
 
 cmake_minimum_required(VERSION 3.16)
-project(dirtybird-miner-cpu LANGUAGES C CXX)
+project(dirtybird-c-miner LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -26,17 +26,17 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
 endif()
 
-# ---- Version (drives the --version/banner string; release CI passes -DDIRTYBIRD_VERSION=<tag>) ----
-set(DIRTYBIRD_VERSION_DEFAULT "dev")
-if(DEFINED DIRTYBIRD_VERSION)
-    set(INTERNAL_DIRTYBIRD_VERSION "${DIRTYBIRD_VERSION}")
-elseif(DEFINED ENV{DIRTYBIRD_VERSION})
-    set(INTERNAL_DIRTYBIRD_VERSION "$ENV{DIRTYBIRD_VERSION}")
+# ---- Version (drives the --version/banner string; release CI passes -DDIRTYBIRD_C_VERSION=<tag>) ----
+set(DIRTYBIRD_C_VERSION_DEFAULT "dev")
+if(DEFINED DIRTYBIRD_C_VERSION)
+    set(INTERNAL_DIRTYBIRD_C_VERSION "${DIRTYBIRD_C_VERSION}")
+elseif(DEFINED ENV{DIRTYBIRD_C_VERSION})
+    set(INTERNAL_DIRTYBIRD_C_VERSION "$ENV{DIRTYBIRD_C_VERSION}")
 else()
-    set(INTERNAL_DIRTYBIRD_VERSION "${DIRTYBIRD_VERSION_DEFAULT}")
+    set(INTERNAL_DIRTYBIRD_C_VERSION "${DIRTYBIRD_C_VERSION_DEFAULT}")
 endif()
-string(REGEX REPLACE "^v" "" INTERNAL_DIRTYBIRD_VERSION "${INTERNAL_DIRTYBIRD_VERSION}")
-message(STATUS "DIRTYBIRD version: ${INTERNAL_DIRTYBIRD_VERSION}")
+string(REGEX REPLACE "^v" "" INTERNAL_DIRTYBIRD_C_VERSION "${INTERNAL_DIRTYBIRD_C_VERSION}")
+message(STATUS "DIRTYBIRD version: ${INTERNAL_DIRTYBIRD_C_VERSION}")
 
 # Release packaging expects executables under build/bin/.
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
@@ -229,26 +229,26 @@ target_include_directories(dluna_runtime PUBLIC ${CMAKE_SOURCE_DIR}/include)
 target_link_libraries(dluna_runtime PUBLIC OpenSSL::Crypto)
 
 # ---- Mining executable: thin wrapper around the lib ----
-add_executable(dirtybird-miner-cpu
+add_executable(dirtybird-c-miner
     src/main.cpp
     src/miner.cpp
     src/network.cpp
     src/difficulty.cpp
 )
 
-target_link_libraries(dirtybird-miner-cpu PRIVATE dluna_stages dluna_runtime)
-target_compile_definitions(dirtybird-miner-cpu PRIVATE DIRTYBIRD_VERSION_STR="${INTERNAL_DIRTYBIRD_VERSION}")
-dluna_copy_runtime_dlls(dirtybird-miner-cpu)
-add_test(NAME dirtybird-selftest COMMAND dirtybird-miner-cpu --selftest)
+target_link_libraries(dirtybird-c-miner PRIVATE dluna_stages dluna_runtime)
+target_compile_definitions(dirtybird-c-miner PRIVATE DIRTYBIRD_C_VERSION_STR="${INTERNAL_DIRTYBIRD_C_VERSION}")
+dluna_copy_runtime_dlls(dirtybird-c-miner)
+add_test(NAME dirtybird-c-selftest COMMAND dirtybird-c-miner --selftest)
 
-add_executable(dirtybird-pgo-train
+add_executable(dirtybird-c-pgo-train
     tools/pgo_trainer.cpp
     src/miner.cpp
     src/difficulty.cpp
 )
-target_include_directories(dirtybird-pgo-train PRIVATE ${CMAKE_SOURCE_DIR}/include)
-target_link_libraries(dirtybird-pgo-train PRIVATE dluna_stages dluna_runtime)
-dluna_copy_runtime_dlls(dirtybird-pgo-train)
+target_include_directories(dirtybird-c-pgo-train PRIVATE ${CMAKE_SOURCE_DIR}/include)
+target_link_libraries(dirtybird-c-pgo-train PRIVATE dluna_stages dluna_runtime)
+dluna_copy_runtime_dlls(dirtybird-c-pgo-train)
 
 # 2026-04-29: phase-A profiling showed libsais is 90% of hash time. Bump it
 # to -O3 for aggressive vectorization on its hot inner loops. (The base level
@@ -262,15 +262,15 @@ set_source_files_properties(src/libsais.c PROPERTIES COMPILE_FLAGS "-O3")
 
 # ---- Platform libs ----
 if(WIN32)
-    target_link_libraries(dirtybird-miner-cpu PRIVATE ws2_32)
+    target_link_libraries(dirtybird-c-miner PRIVATE ws2_32)
 endif()
 
 add_subdirectory(tools/replay)
 
 # ---- Strip release binary ----
 if(CMAKE_BUILD_TYPE STREQUAL "Release" AND NOT PGO_GENERATE)
-    add_custom_command(TARGET dirtybird-miner-cpu POST_BUILD
-        COMMAND ${CMAKE_STRIP} $<TARGET_FILE:dirtybird-miner-cpu> || true
+    add_custom_command(TARGET dirtybird-c-miner POST_BUILD
+        COMMAND ${CMAKE_STRIP} $<TARGET_FILE:dirtybird-c-miner> || true
         COMMENT "Stripping debug symbols"
     )
 endif()

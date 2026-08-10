@@ -108,9 +108,9 @@ int main() {
     }
 
 #ifdef _WIN32
-    std::string exe = ".\\dirtybird-miner-cpu-replay.exe";
+    std::string exe = ".\\dirtybird-c-miner-replay.exe";
 #else
-    std::string exe = "./dirtybird-miner-cpu-replay";
+    std::string exe = "./dirtybird-c-miner-replay";
 #endif
     std::string cmd = exe + " --captures \"" + caps.string() +
                       "\" --report-out \"" + out.string() + "\"";

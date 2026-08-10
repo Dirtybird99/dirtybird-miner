@@ -137,7 +137,7 @@ jobs:
       - name: Build (LTO + PGO)
         shell: msys2 {0}
         run: |
-          export CMAKE_ARGS="-DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DDIRTYBIRD_VERSION=${{ needs.verify.outputs.version }}"
+          export CMAKE_ARGS="-DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DDIRTYBIRD_C_VERSION=${{ needs.verify.outputs.version }}"
           export TRAIN_SECS=60
           bash scripts/build-pgo.sh
 
@@ -147,10 +147,10 @@ jobs:
       - name: Version, self-test, and smoke
         shell: msys2 {0}
         run: |
-          test "$(./build/bin/dirtybird-miner-cpu.exe --version | tr -d '\r')" = \
-            "Dirtybird Miner v${{ needs.verify.outputs.version }}"
-          ./build/bin/dirtybird-miner-cpu.exe --selftest
-          ./build/bin/dirtybird-miner-cpu.exe --help > /dev/null
+          test "$(./build/bin/dirtybird-c-miner.exe --version | tr -d '\r')" = \
+            "Dirtybird C Miner v${{ needs.verify.outputs.version }}"
+          ./build/bin/dirtybird-c-miner.exe --selftest
+          ./build/bin/dirtybird-c-miner.exe --help > /dev/null
 
       - name: Package
         shell: pwsh
@@ -187,7 +187,7 @@ jobs:
       # hashrate (CI previously shipped -DDISABLE_LTO=ON and no PGO, ~20% slower).
       - name: Build (LTO + PGO)
         run: |
-          export CMAKE_ARGS="-DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DDIRTYBIRD_VERSION=${{ needs.verify.outputs.version }}"
+          export CMAKE_ARGS="-DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DDIRTYBIRD_C_VERSION=${{ needs.verify.outputs.version }}"
           export TRAIN_SECS=60
           bash scripts/build-pgo.sh
 
@@ -195,10 +195,10 @@ jobs:
       # is worse than a slow right one). --selftest exits 1 on pow("a") mismatch.
       - name: Version, self-test, and smoke
         run: |
-          test "$(./build/bin/dirtybird-miner-cpu --version)" = \
-            "Dirtybird Miner v${{ needs.verify.outputs.version }}"
-          ./build/bin/dirtybird-miner-cpu --selftest
-          ./build/bin/dirtybird-miner-cpu --help > /dev/null
+          test "$(./build/bin/dirtybird-c-miner --version)" = \
+            "Dirtybird C Miner v${{ needs.verify.outputs.version }}"
+          ./build/bin/dirtybird-c-miner --selftest
+          ./build/bin/dirtybird-c-miner --help > /dev/null
           cmake --build build --parallel
           ctest --test-dir build --output-on-failure
 
@@ -232,7 +232,7 @@ jobs:
       # x86_64 -- identical code+SIMD to Windows, so matched flags = matched hashrate.
       - name: Build (LTO + PGO)
         run: |
-          export CMAKE_ARGS="-DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DDIRTYBIRD_VERSION=${{ needs.verify.outputs.version }}"
+          export CMAKE_ARGS="-DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DDIRTYBIRD_C_VERSION=${{ needs.verify.outputs.version }}"
           export TRAIN_SECS=60
           bash scripts/build-pgo.sh
 
@@ -240,10 +240,10 @@ jobs:
       # is worse than a slow right one). --selftest exits 1 on pow("a") mismatch.
       - name: Version, self-test, and smoke
         run: |
-          test "$(./build/bin/dirtybird-miner-cpu --version)" = \
-            "Dirtybird Miner v${{ needs.verify.outputs.version }}"
-          ./build/bin/dirtybird-miner-cpu --selftest
-          ./build/bin/dirtybird-miner-cpu --help > /dev/null
+          test "$(./build/bin/dirtybird-c-miner --version)" = \
+            "Dirtybird C Miner v${{ needs.verify.outputs.version }}"
+          ./build/bin/dirtybird-c-miner --selftest
+          ./build/bin/dirtybird-c-miner --help > /dev/null
 
       - name: Package (HiveOS/MMPOS)
         run: bash ./scripts/release-hiveos.sh "${{ needs.verify.outputs.tag }}" build dist
@@ -299,7 +299,7 @@ jobs:
         run: |
           NDK="${ANDROID_NDK_LATEST_HOME:-$ANDROID_NDK_HOME}"
           NDKBIN="$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin"
-          export CMAKE_ARGS="-DCMAKE_TOOLCHAIN_FILE=$NDK/build/cmake/android.toolchain.cmake -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-24 -DANDROID_STL=c++_static -DOPENSSL_ROOT_DIR=$GITHUB_WORKSPACE/ossl-android -DOPENSSL_USE_STATIC_LIBS=TRUE -DCMAKE_FIND_ROOT_PATH=$GITHUB_WORKSPACE/ossl-android -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=BOTH -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=BOTH -DCMAKE_FIND_ROOT_PATH_MODE_PACKAGE=BOTH -DDIRTYBIRD_VERSION=${{ needs.verify.outputs.version }}"
+          export CMAKE_ARGS="-DCMAKE_TOOLCHAIN_FILE=$NDK/build/cmake/android.toolchain.cmake -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-24 -DANDROID_STL=c++_static -DOPENSSL_ROOT_DIR=$GITHUB_WORKSPACE/ossl-android -DOPENSSL_USE_STATIC_LIBS=TRUE -DCMAKE_FIND_ROOT_PATH=$GITHUB_WORKSPACE/ossl-android -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=BOTH -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=BOTH -DCMAKE_FIND_ROOT_PATH_MODE_PACKAGE=BOTH -DDIRTYBIRD_C_VERSION=${{ needs.verify.outputs.version }}"
           export GEN_CMAKE_ARGS="-DCMAKE_EXE_LINKER_FLAGS=-static"
           export PROFDATA="$NDKBIN/llvm-profdata"
           export BUILD_DIR=build-android TRAIN_SECS=40 TRAIN_THREADS=4
@@ -310,8 +310,8 @@ jobs:
           NDK="${ANDROID_NDK_LATEST_HOME:-$ANDROID_NDK_HOME}"
           NDKBIN="$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin"
           "$NDKBIN/llvm-readelf" -h \
-            build-android/bin/dirtybird-miner-cpu | grep -iE 'Machine|Class'
-          "$NDKBIN/llvm-strings" build-android/bin/dirtybird-miner-cpu \
+            build-android/bin/dirtybird-c-miner | grep -iE 'Machine|Class'
+          "$NDKBIN/llvm-strings" build-android/bin/dirtybird-c-miner \
             | grep -Fx "${{ needs.verify.outputs.version }}"
 
       - name: Package (Android)
@@ -355,19 +355,19 @@ jobs:
             apt-get install -y --no-install-recommends \
               clang lld llvm cmake ninja-build libssl-dev patchelf \
               libclang-rt-dev binutils ca-certificates git
-            export CMAKE_ARGS="-DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DDIRTYBIRD_VERSION=${{ needs.verify.outputs.version }}"
+            export CMAKE_ARGS="-DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DDIRTYBIRD_C_VERSION=${{ needs.verify.outputs.version }}"
             export TRAIN_SECS=40 TRAIN_THREADS=4
             bash scripts/build-pgo.sh
-            test "$(./build/bin/dirtybird-miner-cpu --version)" = \
-              "Dirtybird Miner v${{ needs.verify.outputs.version }}"
-            ./build/bin/dirtybird-miner-cpu --selftest
-            ./build/bin/dirtybird-miner-cpu --help > /dev/null
+            test "$(./build/bin/dirtybird-c-miner --version)" = \
+              "Dirtybird C Miner v${{ needs.verify.outputs.version }}"
+            ./build/bin/dirtybird-c-miner --selftest
+            ./build/bin/dirtybird-c-miner --help > /dev/null
             PACKAGE_ARCH=arm64 bash ./scripts/release.sh \
               "${{ needs.verify.outputs.tag }}" build dist
             mkdir -p /tmp/verify
-            tar -xzf "dist/dirtybird-miner-arm64-${{ needs.verify.outputs.tag }}.tar.gz" \
+            tar -xzf "dist/dirtybird-c-miner-arm64-${{ needs.verify.outputs.tag }}.tar.gz" \
               -C /tmp/verify
-            /tmp/verify/*/dirtybird-miner-cpu --selftest
+            /tmp/verify/*/dirtybird-c-miner --selftest
           '
 
       - name: Upload artifact
@@ -403,7 +403,7 @@ jobs:
       # format.
       - name: Build (LTO + PGO)
         run: |
-          export CMAKE_ARGS="-DOPENSSL_ROOT_DIR=$(brew --prefix openssl@3) -DOPENSSL_USE_STATIC_LIBS=TRUE -DDIRTYBIRD_VERSION=${{ needs.verify.outputs.version }}"
+          export CMAKE_ARGS="-DOPENSSL_ROOT_DIR=$(brew --prefix openssl@3) -DOPENSSL_USE_STATIC_LIBS=TRUE -DDIRTYBIRD_C_VERSION=${{ needs.verify.outputs.version }}"
           export PROFDATA="$(xcrun -f llvm-profdata)"
           export TRAIN_SECS=60
           bash scripts/build-pgo.sh
@@ -412,10 +412,10 @@ jobs:
       # worse than a slow right one). --selftest exits 1 on pow("a") mismatch.
       - name: Version, self-test, and smoke
         run: |
-          test "$(./build/bin/dirtybird-miner-cpu --version)" = \
-            "Dirtybird Miner v${{ needs.verify.outputs.version }}"
-          ./build/bin/dirtybird-miner-cpu --selftest
-          ./build/bin/dirtybird-miner-cpu --help > /dev/null
+          test "$(./build/bin/dirtybird-c-miner --version)" = \
+            "Dirtybird C Miner v${{ needs.verify.outputs.version }}"
+          ./build/bin/dirtybird-c-miner --selftest
+          ./build/bin/dirtybird-c-miner --help > /dev/null
           cmake --build build --parallel
           ctest --test-dir build --output-on-failure
 
@@ -456,15 +456,15 @@ jobs:
           TAG="${{ needs.verify.outputs.tag }}"
           PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
           {
-            echo "## DIRTYBIRD Miner $TAG"
+            echo "## DIRTYBIRD C Miner $TAG"
             echo
             echo "Assets:"
-            echo "- dirtybird-miner-win64-$TAG.zip"
-            echo "- dirtybird-miner-amd64-$TAG.tar.gz"
-            echo "- dirtybird-miner-arm64-$TAG.tar.gz"
-            echo "- dirtybird-miner-${TAG}_linux_hiveos_mmpos.tar.gz"
-            echo "- dirtybird-miner-${TAG}_aarch64_android.tar.gz"
-            echo "- dirtybird-miner-macos-arm64-$TAG.tar.gz"
+            echo "- dirtybird-c-miner-win64-$TAG.zip"
+            echo "- dirtybird-c-miner-amd64-$TAG.tar.gz"
+            echo "- dirtybird-c-miner-arm64-$TAG.tar.gz"
+            echo "- dirtybird-c-miner-${TAG}_linux_hiveos_mmpos.tar.gz"
+            echo "- dirtybird-c-miner-${TAG}_aarch64_android.tar.gz"
+            echo "- dirtybird-c-miner-macos-arm64-$TAG.tar.gz"
             echo "- SHA256SUMS.txt"
             echo
             if [ -n "$PREV_TAG" ]; then
@@ -482,12 +482,12 @@ jobs:
           set -euo pipefail
           TAG="${{ needs.verify.outputs.tag }}"
           cd artifacts
-          test -f "dirtybird-miner-win64-$TAG.zip"
-          test -f "dirtybird-miner-amd64-$TAG.tar.gz"
-          test -f "dirtybird-miner-arm64-$TAG.tar.gz"
-          test -f "dirtybird-miner-${TAG}_linux_hiveos_mmpos.tar.gz"
-          test -f "dirtybird-miner-${TAG}_aarch64_android.tar.gz"
-          test -f "dirtybird-miner-macos-arm64-$TAG.tar.gz"
+          test -f "dirtybird-c-miner-win64-$TAG.zip"
+          test -f "dirtybird-c-miner-amd64-$TAG.tar.gz"
+          test -f "dirtybird-c-miner-arm64-$TAG.tar.gz"
+          test -f "dirtybird-c-miner-${TAG}_linux_hiveos_mmpos.tar.gz"
+          test -f "dirtybird-c-miner-${TAG}_aarch64_android.tar.gz"
+          test -f "dirtybird-c-miner-macos-arm64-$TAG.tar.gz"
           sha256sum *.zip *.tar.gz > SHA256SUMS.txt
           sha256sum -c SHA256SUMS.txt
           cat SHA256SUMS.txt
@@ -497,10 +497,10 @@ jobs:
           set -euo pipefail
           TAG="${{ needs.verify.outputs.tag }}"
           mkdir verify-linux
-          tar -xzf "artifacts/dirtybird-miner-amd64-$TAG.tar.gz" -C verify-linux
-          BIN="$(find verify-linux -type f -name dirtybird-miner-cpu -print -quit)"
+          tar -xzf "artifacts/dirtybird-c-miner-amd64-$TAG.tar.gz" -C verify-linux
+          BIN="$(find verify-linux -type f -name dirtybird-c-miner -print -quit)"
           test -n "$BIN"
-          test "$("$BIN" --version)" = "Dirtybird Miner v${{ needs.verify.outputs.version }}"
+          test "$("$BIN" --version)" = "Dirtybird C Miner v${{ needs.verify.outputs.version }}"
           "$BIN" --selftest
 
       - name: Create immutable-ready release
@@ -516,7 +516,7 @@ jobs:
             --jq '.verification.verified')" = "true"
           ASSETS=(artifacts/*.zip artifacts/*.tar.gz artifacts/SHA256SUMS.txt)
           gh release create "$TAG" "${ASSETS[@]}" \
-            --verify-tag --title "DIRTYBIRD Miner $TAG" \
+            --verify-tag --title "DIRTYBIRD C Miner $TAG" \
             --notes-file RELEASE_NOTES.md
           test "$(gh release view "$TAG" --json isImmutable \
             --jq '.isImmutable')" = true

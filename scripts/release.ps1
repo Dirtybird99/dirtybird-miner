@@ -15,17 +15,17 @@ if ($Version.StartsWith("v")) { $Version = $Version.Substring(1) }
 if (-not $Version) { throw "Version cannot be empty." }
 
 $AssetVersion = "v$Version"
-$BinaryName = "dirtybird-miner-cpu.exe"
+$BinaryName = "dirtybird-c-miner.exe"
 $BuildRoot = Join-Path $RepoRoot $BuildDir
 $BinDir = Join-Path $BuildRoot "bin"
 $BinaryPath = Join-Path $BinDir $BinaryName
 $StageRoot = Join-Path $RepoRoot $OutputDir
-$PackageName = "dirtybird-miner-win64-$AssetVersion"
+$PackageName = "dirtybird-c-miner-win64-$AssetVersion"
 $PackageDir = Join-Path $StageRoot $PackageName
 $ArchivePath = Join-Path $StageRoot "$PackageName.zip"
 
 Write-Host "================================================"
-Write-Host "DIRTYBIRD Miner Windows Packaging"
+Write-Host "DIRTYBIRD C Miner Windows Packaging"
 Write-Host "Version: $AssetVersion"
 Write-Host "================================================"
 
@@ -59,22 +59,22 @@ foreach ($runtimeFile in $RuntimeFiles) {
 $startLines = @(
     '@echo off',
     'cd /d "%~dp0"',
-    "title DIRTYBIRD Miner $AssetVersion",
+    "title DIRTYBIRD C Miner $AssetVersion",
     'REM Edit config.json for daemon-address / wallet / threads / priority.',
-    'REM To override per-run, append flags below, e.g.:  .\dirtybird-miner-cpu.exe -t 20 -p max',
+    'REM To override per-run, append flags below, e.g.:  .\dirtybird-c-miner.exe -t 20 -p max',
     ':loop',
-    '.\dirtybird-miner-cpu.exe',
+    '.\dirtybird-c-miner.exe',
     'timeout 3',
     'goto loop'
 )
 [System.IO.File]::WriteAllText((Join-Path $PackageDir "start.bat"), ($startLines -join "`r`n") + "`r`n", [System.Text.Encoding]::ASCII)
 
 $QuickStart = @"
-DIRTYBIRD Miner $AssetVersion
+DIRTYBIRD C Miner $AssetVersion
 =============================
 
 Contents:
-- dirtybird-miner-cpu.exe
+- dirtybird-c-miner.exe
 - *.dll  (runtime; keep them next to the exe)
 - config.json   (edit this: daemon-address / wallet / threads / priority)
 - config.json.example

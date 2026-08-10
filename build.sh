@@ -1,5 +1,5 @@
 #!/bin/bash
-# DIRTYBIRD Miner — Native build script for MSYS2/MinGW64
+# DIRTYBIRD C Miner — Native build script for MSYS2/MinGW64
 # Run from the source root (the directory containing this script).
 #
 # Usage:
@@ -25,8 +25,8 @@ case "$MODE" in
       ..
     cmake --build . -j"$JOBS"
     echo ""
-    echo "=== Binary: $(pwd)/dirtybird-miner-cpu.exe ==="
-    ls -la dirtybird-miner-cpu.exe
+    echo "=== Binary: $(pwd)/dirtybird-c-miner.exe ==="
+    ls -la dirtybird-c-miner.exe
     ;;
 
   pgo-gen)
@@ -38,11 +38,11 @@ case "$MODE" in
       -DCMAKE_BUILD_TYPE=Release \
       -DPGO_GENERATE=ON \
       ..
-    cmake --build . --target dirtybird-pgo-train -j"$JOBS"
+    cmake --build . --target dirtybird-c-pgo-train -j"$JOBS"
     echo ""
     echo "=== PGO instrumented trainer ready ==="
     echo "Collect profile data:"
-    echo "  LLVM_PROFILE_FILE=\"pgo-%p.profraw\" ./dirtybird-pgo-train.exe -t 20 --seconds 60 --rotate-ms 5000 --difficulty 1000000000"
+    echo "  LLVM_PROFILE_FILE=\"pgo-%p.profraw\" ./dirtybird-c-pgo-train.exe -t 20 --seconds 60 --rotate-ms 5000 --difficulty 1000000000"
     echo "Then run: ./build.sh pgo-use"
     ;;
 
@@ -53,7 +53,7 @@ case "$MODE" in
     profiles=( *.profraw )
     shopt -u nullglob
     if [ "${#profiles[@]}" -eq 0 ]; then
-      echo "ERROR: No profile data found. Run dirtybird-pgo-train.exe from build-pgo-gen first!"
+      echo "ERROR: No profile data found. Run dirtybird-c-pgo-train.exe from build-pgo-gen first!"
       exit 1
     fi
     llvm-profdata merge -o merged.profdata "${profiles[@]}"
@@ -69,8 +69,8 @@ case "$MODE" in
     cmake --build . -j"$JOBS"
     echo ""
     echo "=== PGO-optimized binary ready ==="
-    echo "Binary: $(pwd)/dirtybird-miner-cpu.exe"
-    ls -la dirtybird-miner-cpu.exe
+    echo "Binary: $(pwd)/dirtybird-c-miner.exe"
+    ls -la dirtybird-c-miner.exe
     ;;
 
   *)
@@ -81,4 +81,4 @@ esac
 
 echo ""
 echo "Test run:"
-echo "  ./dirtybird-miner-cpu.exe -d 127.0.0.1:10100 -w YOUR_WALLET_ADDRESS -t 20"
+echo "  ./dirtybird-c-miner.exe -d 127.0.0.1:10100 -w YOUR_WALLET_ADDRESS -t 20"

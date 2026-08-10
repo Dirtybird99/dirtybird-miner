@@ -74,25 +74,25 @@ jobs:
       - name: Build synthetic trainer (Windows)
         if: runner.os == 'Windows'
         shell: msys2 {0}
-        run: cmake --build build --target dirtybird-pgo-train --parallel
+        run: cmake --build build --target dirtybird-c-pgo-train --parallel
 
       - name: Build synthetic trainer (Linux)
         if: runner.os == 'Linux'
-        run: cmake --build build --target dirtybird-pgo-train --parallel
+        run: cmake --build build --target dirtybird-c-pgo-train --parallel
 
-      # dirtybird-pgo-train hashes synthetic jobs with no daemon and self-exits,
+      # dirtybird-c-pgo-train hashes synthetic jobs with no daemon and self-exits,
       # so it is a deterministic, network-free throughput check for CI.
       - name: Run synthetic benchmark (Windows)
         if: runner.os == 'Windows'
         shell: msys2 {0}
         run: |
-          ./build/bin/dirtybird-pgo-train.exe -t 2 --seconds 10 2>&1 | tee benchmark-results.txt
+          ./build/bin/dirtybird-c-pgo-train.exe -t 2 --seconds 10 2>&1 | tee benchmark-results.txt
           grep -Eq 'pgo_train hashes=[1-9][0-9]*' benchmark-results.txt
 
       - name: Run synthetic benchmark (Linux)
         if: runner.os == 'Linux'
         run: |
-          ./build/bin/dirtybird-pgo-train -t 2 --seconds 10 2>&1 | tee benchmark-results.txt
+          ./build/bin/dirtybird-c-pgo-train -t 2 --seconds 10 2>&1 | tee benchmark-results.txt
           grep -Eq 'pgo_train hashes=[1-9][0-9]*' benchmark-results.txt
 
       - name: Build benchmark summary
@@ -103,7 +103,7 @@ jobs:
             echo "## Synthetic Benchmark"
             echo
             echo "Platform: ${{ matrix.name }}"
-            echo "Trainer: dirtybird-pgo-train -t 2 --seconds 10"
+            echo "Trainer: dirtybird-c-pgo-train -t 2 --seconds 10"
             echo "Hashes: ${HASHES:-unknown}"
           } > benchmark-summary.md
           cat benchmark-summary.md

@@ -20,7 +20,7 @@ BIN_DIR="$REPO_ROOT/$BUILD_DIR/bin"
 BINARY_PATH="$BIN_DIR/$BINARY_NAME"
 STAGE_ROOT="$REPO_ROOT/$OUTPUT_DIR"
 PACKAGE_NAME="dirtybird-c-miner-${ASSET_VERSION}_linux_hiveos_mmpos"
-PACKAGE_DIR="$STAGE_ROOT/$PACKAGE_NAME"
+PACKAGE_DIR="$STAGE_ROOT/$BINARY_NAME"
 ARCHIVE_PATH="$STAGE_ROOT/$PACKAGE_NAME.tar.gz"
 LIB_DIR="$PACKAGE_DIR/lib"
 
@@ -37,6 +37,7 @@ should_bundle() {
     esac
 }
 
+rm -rf "$PACKAGE_DIR"
 mkdir -p "$LIB_DIR"
 cp "$BINARY_PATH" "$PACKAGE_DIR/"; chmod +x "$PACKAGE_DIR/$BINARY_NAME"
 
@@ -60,5 +61,5 @@ chmod +x "$PACKAGE_DIR"/h-*.sh
 [[ -f "$REPO_ROOT/LICENSE" ]]   && cp "$REPO_ROOT/LICENSE"   "$PACKAGE_DIR/"
 
 rm -f "$ARCHIVE_PATH"
-tar -czf "$ARCHIVE_PATH" -C "$PACKAGE_DIR" .
+tar -czf "$ARCHIVE_PATH" -C "$STAGE_ROOT" "$BINARY_NAME"
 echo "Created package: $ARCHIVE_PATH"

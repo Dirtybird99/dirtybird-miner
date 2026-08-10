@@ -136,6 +136,17 @@ jobs:
         run: |
           bash ./scripts/release.sh v0.0.0-ci build dist
           tar -tzf dist/dirtybird-c-miner-amd64-v0.0.0-ci.tar.gz | grep -q 'dirtybird-c-miner-amd64-v0.0.0-ci/dirtybird-c-miner'
+          bash ./scripts/release-hiveos.sh v0.0.0 build dist
+          HIVE_ARCHIVE=dist/dirtybird-c-miner-v0.0.0_linux_hiveos_mmpos.tar.gz
+          HIVE_LIST="$RUNNER_TEMP/hiveos-package.txt"
+          tar -tzf "$HIVE_ARCHIVE" > "$HIVE_LIST"
+          test "$(cut -d/ -f1 "$HIVE_LIST" | sort -u)" = dirtybird-c-miner
+          grep -Fx 'dirtybird-c-miner/dirtybird-c-miner' "$HIVE_LIST" > /dev/null
+          grep -Fx 'dirtybird-c-miner/h-manifest.conf' "$HIVE_LIST" > /dev/null
+          grep -Fx 'dirtybird-c-miner/h-config.sh' "$HIVE_LIST" > /dev/null
+          grep -Fx 'dirtybird-c-miner/h-run.sh' "$HIVE_LIST" > /dev/null
+          grep -Fx 'dirtybird-c-miner/h-stats.sh' "$HIVE_LIST" > /dev/null
+          tar -xOzf "$HIVE_ARCHIVE" dirtybird-c-miner/h-manifest.conf | grep -Fx 'CUSTOM_NAME=dirtybird-c-miner' > /dev/null
 
       - name: Self-test (Windows)
         if: runner.os == 'Windows'

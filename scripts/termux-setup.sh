@@ -22,6 +22,9 @@ BINARY_NAME="dirtybird-c-miner"
 VERSION_FILE=".installed_version"
 ARCHIVE_PREFIX="dirtybird-c-miner-v"
 ARCHIVE_SUFFIX="_aarch64_android.tar.gz"
+LEGACY_INSTALL_DIR="$HOME/dirtybird-miner"
+LEGACY_BINARY_NAME="dirtybird-miner-cpu"
+LEGACY_ARCHIVE_PREFIX="dirtybird-miner-v"
 
 # ── daemon / pool menu ────────────────────────────────────────────────────────
 # The two pools hand out low-difficulty shares, so a phone sees progress every
@@ -162,13 +165,26 @@ info "Dependencies OK."
 
 # ── step 2: handle --uninstall ────────────────────────────────────────────────
 if [ "$UNINSTALL" = true ]; then
-    info "Removing $INSTALL_DIR ..."
-    rm -rf "$INSTALL_DIR"
+    info "Removing Dirtybird C Miner installations ..."
+    rm -rf -- "$INSTALL_DIR" "$LEGACY_INSTALL_DIR"
     info "Done. (Config and binaries removed.)"
     exit 0
 fi
 
 # ── step 3: get the binary ────────────────────────────────────────────────────
+# Releases before the rebrand installed here. Move the complete directory so
+# config.json and the installed-version marker survive the upgrade.
+if [ ! -e "$INSTALL_DIR" ] && [ -d "$LEGACY_INSTALL_DIR" ]; then
+    info "Migrating legacy installation from $LEGACY_INSTALL_DIR ..."
+    mv "$LEGACY_INSTALL_DIR" "$INSTALL_DIR"
+    if [ ! -e "$INSTALL_DIR/$BINARY_NAME" ] &&
+       [ -e "$INSTALL_DIR/$LEGACY_BINARY_NAME" ]; then
+        mv "$INSTALL_DIR/$LEGACY_BINARY_NAME" "$INSTALL_DIR/$BINARY_NAME"
+    fi
+elif [ -e "$INSTALL_DIR" ] && [ -d "$LEGACY_INSTALL_DIR" ]; then
+    warn "Both current and legacy installations exist; using $INSTALL_DIR."
+fi
+
 mkdir -p "$INSTALL_DIR"
 cd "$INSTALL_DIR"
 
@@ -184,6 +200,18 @@ fetch() {
 latest_release_tag() {
     fetch "https://api.github.com/repos/$REPO/releases/latest" 2>/dev/null \
         | jq -r '.tag_name // empty' 2>/dev/null || true
+}
+
+download_file() {
+    local url="$1" output="$2"
+    rm -f "$output"
+    if command -v curl &>/dev/null; then
+        curl -fsSL "$url" -o "$output" && return 0
+    else
+        wget -q --show-progress -O "$output" "$url" && return 0
+    fi
+    rm -f "$output"
+    return 1
 }
 
 LATEST_TAG=""
@@ -205,19 +233,15 @@ else
     DOWNLOAD_URL="https://github.com/$REPO/releases/download/${LATEST_TAG}/${ARCHIVE}"
 
     info "Downloading $ARCHIVE ..."
-    if command -v curl &>/dev/null; then
-        if ! curl -fsSL "$DOWNLOAD_URL" -o "$ARCHIVE"; then
-            err "Download failed (curl)."
+    if ! download_file "$DOWNLOAD_URL" "$ARCHIVE"; then
+        LEGACY_ARCHIVE="${LEGACY_ARCHIVE_PREFIX}${LATEST_TAG#v}${ARCHIVE_SUFFIX}"
+        LEGACY_DOWNLOAD_URL="https://github.com/$REPO/releases/download/${LATEST_TAG}/${LEGACY_ARCHIVE}"
+        warn "$ARCHIVE is unavailable; trying the legacy release asset."
+        if ! download_file "$LEGACY_DOWNLOAD_URL" "$LEGACY_ARCHIVE"; then
+            err "Download failed for both current and legacy Android assets."
             exit 1
         fi
-    elif command -v wget &>/dev/null; then
-        if ! wget -q --show-progress -O "$ARCHIVE" "$DOWNLOAD_URL"; then
-            err "Download failed (wget)."
-            exit 1
-        fi
-    else
-        err "Neither curl nor wget is available."
-        exit 1
+        ARCHIVE="$LEGACY_ARCHIVE"
     fi
 
     info "Extracting..."
@@ -227,8 +251,9 @@ else
     # package directory -- while $VERSION_FILE still advanced to the new tag,
     # so the update looked like it worked and never did. Also sweep away any
     # package directory a run of that older script orphaned here.
-    rm -f "./$BINARY_NAME"
-    find . -maxdepth 1 -type d -name "${ARCHIVE_PREFIX}*" -exec rm -rf {} + 2>/dev/null || true
+    rm -f "./$BINARY_NAME" "./$LEGACY_BINARY_NAME"
+    find . -maxdepth 1 -type d \( -name "${ARCHIVE_PREFIX}*" -o -name "${LEGACY_ARCHIVE_PREFIX}*" \) \
+        -exec rm -rf {} + 2>/dev/null || true
 
     tar xzf "$ARCHIVE"
     rm -f "$ARCHIVE"
@@ -236,7 +261,8 @@ else
     # The release tarball nests everything under <package>/ (see
     # scripts/release-android.sh); lift the binary out to $INSTALL_DIR.
     if [ ! -f "./$BINARY_NAME" ]; then
-        NESTED="$(find . -maxdepth 2 -name "$BINARY_NAME" -type f | head -1)"
+        NESTED="$(find . -maxdepth 2 -type f \
+            \( -name "$BINARY_NAME" -o -name "$LEGACY_BINARY_NAME" \) | head -1)"
         if [ -n "$NESTED" ]; then
             mv "$NESTED" "./$BINARY_NAME"
             # dirname is never "." here: this branch only runs when
@@ -259,7 +285,9 @@ if ! BINARY_VERSION="$(./"$BINARY_NAME" --version 2>/dev/null)" ||
     exit 1
 fi
 
-if [ -n "$LATEST_TAG" ] && [ "$BINARY_VERSION" != "Dirtybird C Miner $LATEST_TAG" ]; then
+if [ -n "$LATEST_TAG" ] &&
+   [ "$BINARY_VERSION" != "Dirtybird C Miner $LATEST_TAG" ] &&
+   [ "$BINARY_VERSION" != "Dirtybird Miner $LATEST_TAG" ]; then
     warn "Update available: $BINARY_VERSION -> Dirtybird C Miner $LATEST_TAG."
     warn "Update before benchmarking:"
     note "curl -fsSL https://raw.githubusercontent.com/$REPO/master/scripts/termux-setup.sh | bash -s -- --update"

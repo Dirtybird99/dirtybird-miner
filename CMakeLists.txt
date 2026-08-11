@@ -236,7 +236,11 @@ add_executable(dirtybird-c-miner
     src/difficulty.cpp
 )
 
-target_link_libraries(dirtybird-c-miner PRIVATE dluna_stages dluna_runtime)
+# pthread must be linked explicitly: on glibc < 2.34 (e.g. the Ubuntu 20.04
+# baseline HiveOS runs on) pthread lives in libpthread.so, not merged into libc.
+find_package(Threads REQUIRED)
+
+target_link_libraries(dirtybird-c-miner PRIVATE dluna_stages dluna_runtime Threads::Threads)
 target_compile_definitions(dirtybird-c-miner PRIVATE DIRTYBIRD_C_VERSION_STR="${INTERNAL_DIRTYBIRD_C_VERSION}")
 dluna_copy_runtime_dlls(dirtybird-c-miner)
 add_test(NAME dirtybird-c-selftest COMMAND dirtybird-c-miner --selftest)
@@ -247,7 +251,7 @@ add_executable(dirtybird-c-pgo-train
     src/difficulty.cpp
 )
 target_include_directories(dirtybird-c-pgo-train PRIVATE ${CMAKE_SOURCE_DIR}/include)
-target_link_libraries(dirtybird-c-pgo-train PRIVATE dluna_stages dluna_runtime)
+target_link_libraries(dirtybird-c-pgo-train PRIVATE dluna_stages dluna_runtime Threads::Threads)
 dluna_copy_runtime_dlls(dirtybird-c-pgo-train)
 
 # 2026-04-29: phase-A profiling showed libsais is 90% of hash time. Bump it

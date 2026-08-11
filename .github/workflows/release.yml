@@ -214,6 +214,10 @@ jobs:
   build-hiveos:
     name: Build HiveOS/MMPOS Package
     runs-on: ubuntu-latest
+    # HiveOS rigs run Ubuntu 20.04 (glibc 2.31). Build inside a 20.04 container
+    # so the binary + bundled libs never demand a newer glibc than the rigs have.
+    container:
+      image: ubuntu:20.04
     timeout-minutes: 60
     needs: verify
     steps:
@@ -223,16 +227,35 @@ jobs:
           ref: ${{ needs.verify.outputs.commit }}
           lfs: true
 
-      - name: Install dependencies
+      - name: Install dependencies (clang-18, glibc 2.31)
         run: |
-          sudo apt-get update
-          sudo apt-get install -y clang llvm cmake ninja-build lld patchelf libssl-dev
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            gnupg ca-certificates curl cmake ninja-build libssl-dev patchelf binutils git
+          mkdir -p /usr/share/keyrings /root/.gnupg
+          chmod 700 /root/.gnupg
+          gpg --batch --homedir /root/.gnupg --no-default-keyring \
+            --keyring /usr/share/keyrings/llvm-archive-keyring.gpg \
+            --keyserver hkp://keyserver.ubuntu.com:80 \
+            --recv-keys 15CF4D18AF4F7421 1>/dev/null 2>&1 || \
+          gpg --batch --homedir /root/.gnupg --no-default-keyring \
+            --keyring /usr/share/keyrings/llvm-archive-keyring.gpg \
+            --keyserver hkp://keyserver.ubuntu.com:80 \
+            --recv-keys 15CF4D18AF4F7421
+          echo "deb [signed-by=/usr/share/keyrings/llvm-archive-keyring.gpg] http://apt.llvm.org/focal/ llvm-toolchain-focal-18 main" > /etc/apt/sources.list.d/llvm-18.list
+          apt-get update
+          apt-get install -y --no-install-recommends clang-18 lld-18 llvm-18 libclang-rt-18-dev
+          ln -sf /usr/bin/clang-18 /usr/local/bin/clang
+          ln -sf /usr/bin/clang++-18 /usr/local/bin/clang++
+          ln -sf /usr/bin/llvm-profdata-18 /usr/local/bin/llvm-profdata
+          ln -sf /usr/bin/ld.lld-18 /usr/local/bin/ld.lld
 
       # LTO + PGO two-pass build (see scripts/build-pgo.sh). HiveOS/MMPOS rigs are
       # x86_64 -- identical code+SIMD to Windows, so matched flags = matched hashrate.
       - name: Build (LTO + PGO)
         run: |
-          export CMAKE_ARGS="-DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DDIRTYBIRD_C_VERSION=${{ needs.verify.outputs.version }}"
+          export CLANG_MAJ=18
+          export CMAKE_ARGS="-DCMAKE_C_COMPILER=clang-18 -DCMAKE_CXX_COMPILER=clang++-18 -DDIRTYBIRD_C_VERSION=${{ needs.verify.outputs.version }}"
           export TRAIN_SECS=60
           bash scripts/build-pgo.sh
 

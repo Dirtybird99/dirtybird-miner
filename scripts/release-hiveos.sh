@@ -56,6 +56,8 @@ cp "$REPO_ROOT/config/h-manifest.conf" "$PACKAGE_DIR/"
 cp "$REPO_ROOT/config/h-config.sh"     "$PACKAGE_DIR/"
 cp "$REPO_ROOT/config/h-run.sh"        "$PACKAGE_DIR/"
 cp "$REPO_ROOT/config/h-stats.sh"      "$PACKAGE_DIR/"
+# Template the release version into the packaged stats JSON (dashboard shows it).
+sed -i "s/__VERSION__/v$VERSION/g" "$PACKAGE_DIR/h-stats.sh"
 chmod +x "$PACKAGE_DIR"/h-*.sh
 [[ -f "$REPO_ROOT/README.md" ]] && cp "$REPO_ROOT/README.md" "$PACKAGE_DIR/"
 [[ -f "$REPO_ROOT/LICENSE" ]]   && cp "$REPO_ROOT/LICENSE"   "$PACKAGE_DIR/"

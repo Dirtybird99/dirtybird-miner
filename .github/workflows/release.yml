@@ -218,9 +218,22 @@ jobs:
     # so the binary + bundled libs never demand a newer glibc than the rigs have.
     container:
       image: ubuntu:20.04
+    # focal's apt pulls tzdata transitively; without this a dependency prompt
+    # blocks until the job times out instead of failing fast.
+    env:
+      DEBIAN_FRONTEND: noninteractive
     timeout-minutes: 60
     needs: verify
     steps:
+      # actions/checkout executes inside the job container, and the bare
+      # ubuntu:20.04 image ships neither git nor git-lfs -- so the checkout
+      # cannot run at all until they exist. Only these two are needed here;
+      # the rest of the toolchain is installed after the source is present.
+      - name: Install git (container ships none)
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends git git-lfs ca-certificates
+
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -270,6 +283,21 @@ jobs:
 
       - name: Package (HiveOS/MMPOS)
         run: bash ./scripts/release-hiveos.sh "${{ needs.verify.outputs.tag }}" build dist
+
+      # A rig rejects the miner at load time, and the bundled libs plus the
+      # $ORIGIN/lib rpath only exist once packaging has run -- so the tarball
+      # itself has to be executed, not just the build-tree binary. Still inside
+      # the 20.04 container, so this is a real glibc 2.31 load.
+      - name: Verify packaged tarball runs on glibc 2.31
+        run: |
+          mkdir -p /tmp/verify
+          tar -xzf "dist/dirtybird-c-miner-${{ needs.verify.outputs.tag }}_linux_hiveos_mmpos.tar.gz" \
+            -C /tmp/verify
+          BIN="$(find /tmp/verify -type f -name dirtybird-c-miner -print -quit)"
+          test -n "$BIN"
+          test "$("$BIN" --version)" = \
+            "Dirtybird C Miner v${{ needs.verify.outputs.version }}"
+          "$BIN" --selftest
 
       - name: Upload artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

@@ -63,8 +63,18 @@ endif()
 # disagree = noise). The old "-O2 proven winner (icache)" finding predates
 # PGO; text grew only +5KB at -O3. Flag choice is now evidence-backed.
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64|i[0-9]86)$")
-    set(BASE_CXX_FLAGS "-O3 -DNDEBUG -march=x86-64-v3 -mtune=raptorlake -fomit-frame-pointer -mavx2 -fno-vectorize -fno-slp-vectorize -finline-functions")
-    set(BASE_C_FLAGS   "-O3 -DNDEBUG -march=x86-64-v3 -mtune=raptorlake -fomit-frame-pointer -mavx2")
+    # CPU tuning knobs. Defaults reproduce the historical build exactly
+    # (raptorlake tune + vectorization off — that was verified on a Raptor
+    # Lake i7-13700HX). On other silicon (e.g. AMD Zen 3/4) pass
+    # -DDLUNA_MTUNE=znver3 and/or -DDLUNA_VECTORIZE=ON and measure.
+    set(DLUNA_MTUNE "raptorlake" CACHE STRING "-mtune= target for x86-64 builds")
+    set(DLUNA_VECTORIZE OFF CACHE BOOL "Enable clang auto-vectorization (default OFF)")
+    set(_DLUNA_NO_VEC "-fno-vectorize -fno-slp-vectorize")
+    if(DLUNA_VECTORIZE)
+        set(_DLUNA_NO_VEC "")
+    endif()
+    set(BASE_CXX_FLAGS "-O3 -DNDEBUG -march=x86-64-v3 -mtune=${DLUNA_MTUNE} -fomit-frame-pointer -mavx2 ${_DLUNA_NO_VEC} -finline-functions")
+    set(BASE_C_FLAGS   "-O3 -DNDEBUG -march=x86-64-v3 -mtune=${DLUNA_MTUNE} -fomit-frame-pointer -mavx2 ${_DLUNA_NO_VEC}")
 elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64)$")
     set(BASE_CXX_FLAGS "-O3 -DNDEBUG -march=armv8-a+crypto -fomit-frame-pointer -finline-functions")
     set(BASE_C_FLAGS   "-O3 -DNDEBUG -march=armv8-a+crypto -fomit-frame-pointer")
@@ -82,6 +92,35 @@ if(NOT DISABLE_LTO)
     # Apple's ld64 handles LTO natively via libLTO and rejects -fuse-ld=lld.
     if(IS_CLANG AND NOT APPLE)
         set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fuse-ld=lld")
+    endif()
+endif()
+
+# ---- Clang PGO runtime lib search path (MSYS2/MinGW quirk) ----
+# `clang -fprofile-generate` looks for libclang_rt.profile under
+#   <clang-resource-dir>/lib/<triple>/  (e.g. .../lib/x86_64-w64-windows-gnu/)
+# but MSYS2's mingw-w64-x86_64-compiler-rt installs it under
+#   <clang-resource-dir>/lib/windows/
+# so the stock PGO build fails to link with "could not open
+# libclang_rt.profile.a". Resolve the real resource dir at configure time and
+# add the location that actually exists. No-op where the layout is standard.
+if(PGO_GENERATE OR PGO_USE)
+    if(IS_CLANG)
+        execute_process(
+            COMMAND ${CMAKE_C_COMPILER} -print-resource-dir
+            OUTPUT_VARIABLE CLANG_RESOURCE_DIR
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+            ERROR_QUIET)
+        if(CLANG_RESOURCE_DIR)
+            file(GLOB _CLANG_PGO_RT
+                "${CLANG_RESOURCE_DIR}/lib/*/libclang_rt.profile*.a")
+            if(_CLANG_PGO_RT)
+                list(GET _CLANG_PGO_RT 0 _RT_PATH)
+                get_filename_component(_RT_DIR "${_RT_PATH}" DIRECTORY)
+                set(CMAKE_EXE_LINKER_FLAGS
+                    "${CMAKE_EXE_LINKER_FLAGS} -L\"${_RT_DIR}\"")
+                message(STATUS "PGO runtime lib: ${_RT_PATH}")
+            endif()
+        endif()
     endif()
 endif()
 
@@ -147,9 +186,13 @@ endif()
 
 # USE_ASTRO_SPSA gates the x86-only, AVX2 Tritonn verification path (and its
 # extra workerData fields). The live hash path (descriptor-SA / libsais /
-# wolfBranch) does not need it; gating it off is a tested config (Δ-0.31 KH/s).
+# wolfBranch) does not need it; gating it off is a tested config (Δ-0.31 KH/s
+# on i7-13700HX, within thermal noise). It also drops workerData from ~1.15 MB
+# to ~360 KB — a real L3 working-set win on dual-CCD AM4/AM5 (2×32MB L3) where
+# 24 x2 workers at 1.15 MB each exceed L3. Tunable: -DDLUNA_SPSA=OFF.
 # Off on non-x86 so the tree cross-compiles for aarch64.
-if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64|i[0-9]86)$")
+option(DLUNA_SPSA "Enable the USE_ASTRO_SPSA Tritonn verification path" ON)
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64|i[0-9]86)$" AND DLUNA_SPSA)
     add_definitions(-DUSE_ASTRO_SPSA=1)
 endif()
 
@@ -203,13 +246,20 @@ add_library(dluna_stages OBJECT
     src/v114_stubs.cpp
 )
 
-# Tritonn verification path uses AVX2 helpers and is referenced only under
-# USE_ASTRO_SPSA (x86-only, above). Compile it on x86 only so non-x86 builds
-# (aarch64) don't pull in <immintrin.h>.
+# SHA-NI and the 2-way batched SHA are part of the live hash path on x86.
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64|i[0-9]86)$")
     target_sources(dluna_stages PRIVATE
         src/sha256_ni.cpp
         src/sha256_x2.cpp
+    )
+endif()
+
+# Tritonn verification path uses AVX2 helpers and is referenced only under
+# USE_ASTRO_SPSA (x86-only, above). Compile it on x86 only when the SPSA path
+# is enabled, so non-x86 and -DDLUNA_SPSA=OFF builds don't pull in
+# <immintrin.h> or the SPSA-only workerData fields.
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64|i[0-9]86)$" AND DLUNA_SPSA)
+    target_sources(dluna_stages PRIVATE
         src/spsa_tritonn.cpp
         src/spsa_tritonn_helpers.cpp
     )

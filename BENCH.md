@@ -51,6 +51,65 @@ PGO prerequisites (MSYS2/MinGW64): `mingw-w64-x86_64-clang`,
 `mingw-w64-x86_64-compiler-rt`, `mingw-w64-x86_64-llvm` (llvm-profdata).
 CMake now auto-locates the clang PGO runtime lib — no manual `-L` needed.
 
+## Verification (the speedup is real, and the work is unchanged)
+
+Three independent confirmations, all on the same 5900X:
+
+### 1. Cause — the compiled artifacts genuinely differ by the tuning flags
+
+Extracted from each build's `build.ninja`:
+
+| | stock | tuned + PGO |
+|---|---|---|
+| `-mtune=` | `raptorlake` | `znver3` |
+| `-fno-vectorize -fno-slp-vectorize` | present | absent |
+| `-fprofile-use=` | — | `.../merged.profdata` |
+
+### 2. Same work — byte-identical digests over 2000 nonces
+
+A harness (`samedigest.cpp`) linked against **each build's own object files**
+runs the full pipeline (SHA-256 → Salsa20 → RC4 → 278× wolf-compute →
+descriptor-SA → SHA-256-over-SA) over 2000 identical nonces and prints a
+rolling FNV-1a digest of all 2000 output hashes:
+
+```
+STOCK: count=2000 digest=be73943ed6280b5f
+PGO:   count=2000 digest=be73943ed6280b5f
+```
+
+Identical digests ⇒ the PGO build computes **exactly the same hashes** — it
+is not skipping, altering, or shortcutting any work. (The stock binary's own
+`--selftest` and the PGO binary's `--selftest` both pass `pow("a") =
+54e2324d...` as well.)
+
+### 3. Speed — identical work completes faster, single-threaded
+
+Same 2000 hashes, one thread, only compiler flags differ:
+
+```
+STOCK: 2000 hashes in 1.093s
+PGO:   2000 hashes in 0.937s   →  -14.3% time, +16.6% throughput
+```
+
+### Controlled stock-vs-PGO comparison (12 threads, interleaved, `-p max`)
+
+Both built from the same source tree with only the tuning diff applied
+(controlled experiment — no code changes):
+
+| Build | R1 | R2 | R3 | Mean | Δ |
+|---|---|---|---|---|---|
+| stock (from-source, stock flags) | 22.55 | 22.91 | 21.82 | **22.43** | — |
+| tuned (znver3 + vec) | 25.59 | 25.58 | 25.75 | **25.64** | +14.3% |
+| tuned + PGO | 30.02 | 29.53 | 30.56 | **30.04** | +33.9% |
+
+Per-core: stock 1.87 KH/s → tuned+PGO 2.50 KH/s (+34%).
+
+The single-thread delta (+16.6%) is smaller than the 12T delta (+33.9%):
+under load the vectorized SA-build loops get more memory-pipeline headroom,
+so the PGO+vectorize benefit compounds. The 1T wall-time is the cleanest
+controlled proof (no SMT/L3 contention) and confirms a real per-hash speedup
+on identical work.
+
 ## Notes / caveats
 
 - The default `-mtune=raptorlake` + `-fno-vectorize` flags were verified on a
